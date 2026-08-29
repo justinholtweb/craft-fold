@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Fold's mark: a road map with the creases still in it.
+
+  The silhouette is the one everybody recognises without being told — three panels, the outer two
+  pulled down and up so the top and bottom edges zigzag. That shape alone reads as "map" at 16
+  pixels, which is where a CP nav icon actually lives, so the pin sits in the middle panel as a
+  second reading rather than as the thing carrying the meaning.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+  <path d="M6 26 L35 15 L65 26 L94 15 L94 74 L65 85 L35 74 L6 85 Z"/>
+  <path d="M35 15 L35 74" stroke-dasharray="7 6" stroke-width="4"/>
+  <path d="M65 26 L65 85" stroke-dasharray="7 6" stroke-width="4"/>
+  <path d="M50 33 c-7.2 0-13 5.6-13 12.5 0 9 13 20.5 13 20.5 s13-11.5 13-20.5 c0-6.9-5.8-12.5-13-12.5 z" stroke-width="5"/>
+  <circle cx="50" cy="45.5" r="3.6" fill="currentColor" stroke="none"/>
+</svg>

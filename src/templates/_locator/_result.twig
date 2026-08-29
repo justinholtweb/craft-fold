@@ -1,0 +1,47 @@
+{#
+  One result.
+
+  The `data-fold-json` attribute is how the map gets its first set of markers without a request:
+  the runtime reads the locations back out of the DOM it was handed, so the map matches the list
+  the visitor is already looking at, and the page is useful before any fetch happens.
+#}
+<li class="fold-result" data-fold-id="{{ location.id }}" data-fold-json="{{ {
+    id: location.id,
+    title: location.title,
+    url: location.url,
+    lat: location.lat,
+    lng: location.lng,
+    address: location.getFormattedAddress({ html: false }),
+    phone: location.phone,
+    directionsUrl: location.getDirectionsUrl(),
+}|json_encode }}">
+    <h3 class="fold-result__name">
+        {% if location.url %}
+            <a href="{{ location.url }}">{{ location.title }}</a>
+        {% else %}
+            {{ location.title }}
+        {% endif %}
+    </h3>
+
+    {% if location.distance is not null %}
+        <p class="fold-result__distance">{{ location.distance|round(1) }} {{ unit }}</p>
+    {% endif %}
+
+    {% set address = location.getFormattedAddress({ html: false }) %}
+    {% if address %}
+        <p class="fold-result__address">{{ address|nl2br }}</p>
+    {% endif %}
+
+    {% if not location.hours.isEmpty() %}
+        <p class="fold-result__open fold-result__open--{{ location.isOpenNow() ? 'yes' : 'no' }}">
+            {{ location.isOpenNow() ? 'Open now'|t('fold') : 'Closed now'|t('fold') }}
+        </p>
+    {% endif %}
+
+    <p class="fold-result__links">
+        {% if location.phone %}<a href="tel:{{ location.phone }}">{{ location.phone }}</a>{% endif %}
+        {% if location.getDirectionsUrl() %}
+            <a href="{{ location.getDirectionsUrl() }}" rel="noopener" target="_blank">{{ 'Directions'|t('fold') }}</a>
+        {% endif %}
+    </p>
+</li>

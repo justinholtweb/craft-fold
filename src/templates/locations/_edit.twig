@@ -1,0 +1,285 @@
+{% extends '_layouts/cp' %}
+{% import '_includes/forms' as forms %}
+
+{% set title = isNew ? 'New location'|t('fold') : location.getUiLabel() %}
+{% set selectedSubnavItem = 'locations' %}
+{% set fullPageForm = true %}
+{% set crumbs = [
+    { label: 'Fold'|t('fold'), url: url('fold') },
+    { label: 'Locations'|t('fold'), url: url('fold/locations') },
+] %}
+
+{% set fieldLayout = location.getFieldLayout() %}
+{% set customFieldsForm = fieldLayout ? fieldLayout.createForm(location) : null %}
+
+{% block content %}
+    <input type="hidden" name="action" value="fold/locations/save">
+    {{ redirectInput('fold/locations/{id}') }}
+    {% if location.id %}<input type="hidden" name="locationId" value="{{ location.id }}">{% endif %}
+    <input type="hidden" name="siteId" value="{{ location.siteId }}">
+
+    {{ forms.textField({
+        label: 'Name'|t('fold'),
+        id: 'title',
+        name: 'title',
+        value: location.title,
+        required: true,
+        errors: location.getErrors('title'),
+        autofocus: isNew,
+    }) }}
+
+    {{ forms.textField({
+        label: 'Slug'|t('app'),
+        id: 'slug',
+        name: 'slug',
+        value: location.slug,
+        errors: location.getErrors('slug'),
+    }) }}
+
+    <hr>
+
+    <h2>{{ 'Address'|t('fold') }}</h2>
+
+    {% if location.commerceInventoryLocationId and plugin.commerce.isEnabled() %}
+        <p class="light">
+            {{ 'This location’s address comes from Craft Commerce and is updated from there.'|t('fold') }}
+        </p>
+    {% endif %}
+
+    {# The country select is named by hand rather than wrapped in `{% namespace %}`. The address
+       fields below it are namespaced in PHP, through the View, because Craft's subdivision
+       selects register JavaScript that resolves their ids against the View's namespace — see the
+       controller. Doing the two halves differently is deliberate; doing them the same way breaks
+       the State field. #}
+    {{ forms.selectField({
+        label: 'Country'|t('app'),
+        id: 'address-countryCode',
+        name: 'address[countryCode]',
+        options: countryOptions,
+        value: address.countryCode,
+        inputAttributes: {
+            data: { 'fold-country': true },
+        },
+    }) }}
+
+    <div id="fold-address-fields">
+        {{ addressFieldsHtml|raw }}
+    </div>
+
+    <div class="field">
+        <div class="heading"><label>{{ 'Coordinates'|t('fold') }}</label></div>
+        <div class="instructions">
+            <p>{{ 'Leave these blank to have Fold look them up from the address. Editing them by hand marks the location as manually placed, and Fold will stop overwriting them.'|t('fold') }}</p>
+        </div>
+        <div class="flex">
+            {{ forms.text({
+                id: 'lat',
+                name: 'lat',
+                value: location.lat,
+                placeholder: 'Latitude'|t('fold'),
+                size: 14,
+            }) }}
+            {{ forms.text({
+                id: 'lng',
+                name: 'lng',
+                value: location.lng,
+                placeholder: 'Longitude'|t('fold'),
+                size: 14,
+            }) }}
+            <button type="button" class="btn" id="fold-geocode">{{ 'Look up'|t('fold') }}</button>
+            <span class="spinner hidden" id="fold-geocode-spinner"></span>
+        </div>
+        <p class="error hidden" id="fold-geocode-error"></p>
+        {% if location.getErrors('lat') %}
+            <ul class="errors">
+                {% for error in location.getErrors('lat') %}<li>{{ error }}</li>{% endfor %}
+            </ul>
+        {% endif %}
+    </div>
+
+    <hr>
+
+    <h2>{{ 'Opening hours'|t('fold') }}</h2>
+    <p class="light">{{ 'Times use a 24-hour clock. A closing time earlier than the opening time means the location stays open past midnight.'|t('fold') }}</p>
+
+    <table class="data fullwidth fold-hours">
+        <thead>
+            <tr>
+                <th scope="col">{{ 'Day'|t('fold') }}</th>
+                <th scope="col">{{ 'Opens'|t('fold') }}</th>
+                <th scope="col">{{ 'Closes'|t('fold') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for day in days %}
+                {% set ranges = location.hours.forDay(day) %}
+                {% set range = ranges|length ? ranges[0] : { open: '', close: '' } %}
+                <tr>
+                    <th scope="row">{{ dayLabels[day] }}</th>
+                    <td>{{ forms.text({ name: 'hours[' ~ day ~ '][0][open]', value: range.open, placeholder: '09:00', size: 8 }) }}</td>
+                    <td>{{ forms.text({ name: 'hours[' ~ day ~ '][0][close]', value: range.close, placeholder: '17:00', size: 8 }) }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {{ forms.textField({
+        label: 'Hours note'|t('fold'),
+        instructions: 'Shown instead of, or alongside, the grid — “By appointment”, “Closed for refurbishment”.'|t('fold'),
+        name: 'hours[note]',
+        value: location.hours.note,
+    }) }}
+
+    {% if customFieldsForm %}
+        <hr>
+        {{ customFieldsForm.render()|raw }}
+    {% endif %}
+{% endblock %}
+
+{% block details %}
+    <div class="meta">
+        {{ forms.selectField({
+            label: 'Group'|t('fold'),
+            id: 'groupId',
+            name: 'groupId',
+            options: groupOptions,
+            value: location.groupId,
+            errors: location.getErrors('groupId'),
+        }) }}
+
+        {{ forms.lightswitchField({
+            label: 'Enabled'|t('app'),
+            id: 'enabled',
+            name: 'enabled',
+            on: location.enabled,
+        }) }}
+    </div>
+
+    <div class="meta">
+        {{ forms.textField({
+            label: 'Phone'|t('fold'),
+            name: 'phone',
+            value: location.phone,
+            errors: location.getErrors('phone'),
+        }) }}
+
+        {{ forms.textField({
+            label: 'Email'|t('fold'),
+            name: 'email',
+            value: location.email,
+            errors: location.getErrors('email'),
+        }) }}
+
+        {{ forms.textField({
+            label: 'Website'|t('fold'),
+            name: 'websiteUrl',
+            value: location.websiteUrl,
+            errors: location.getErrors('websiteUrl'),
+        }) }}
+
+        {{ forms.selectField({
+            label: 'Timezone'|t('fold'),
+            instructions: 'Which clock “open now” is answered on. Defaults to the site’s.'|t('fold'),
+            name: 'timezone',
+            options: timezoneOptions,
+            value: location.timezone,
+        }) }}
+    </div>
+
+    {% if commerceOptions|length %}
+        <div class="meta">
+            {{ forms.selectField({
+                label: 'Commerce inventory location'|t('fold'),
+                instructions: 'Linking pulls the address from Commerce and lets the locator filter by stock.'|t('fold'),
+                name: 'commerceInventoryLocationId',
+                options: commerceOptions,
+                value: location.commerceInventoryLocationId,
+            }) }}
+        </div>
+    {% endif %}
+
+    <div class="meta read-only">
+        <div class="data">
+            <div class="heading">{{ 'Geocoding'|t('fold') }}</div>
+            <div class="value">
+                {% if location.geocodeState == 'ok' %}{{ 'Placed from the address'|t('fold') }}
+                {% elseif location.geocodeState == 'manual' %}{{ 'Placed by hand'|t('fold') }}
+                {% elseif location.geocodeState == 'failed' %}<span class="error">{{ location.geocodeError ?: 'Could not be placed'|t('fold') }}</span>
+                {% else %}{{ 'Awaiting lookup'|t('fold') }}
+                {% endif %}
+            </div>
+        </div>
+
+        {% if location.geocodedAt %}
+            <div class="data">
+                <div class="heading">{{ 'Last looked up'|t('fold') }}</div>
+                <div class="value">{{ location.geocodedAt|datetime('short') }}</div>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% js %}
+(function() {
+    var country = document.querySelector('[data-fold-country]');
+    var fields = document.getElementById('fold-address-fields');
+
+    // Which address fields a country wants is a question only the server can answer —
+    // `commerceguys/addressing` knows that Ireland has no postcode field and Japan puts the
+    // prefecture first. So the country select refetches the fields rather than hiding some.
+    if (country && fields) {
+        country.addEventListener('change', function() {
+            Craft.sendActionRequest('POST', 'fold/locations/address-fields', {
+                data: { countryCode: country.value },
+            }).then(function(response) {
+                fields.innerHTML = response.data.html;
+                Craft.appendHeadHtml(response.data.headHtml);
+                Craft.appendBodyHtml(response.data.bodyHtml);
+                Craft.initUiElements(fields);
+            });
+        });
+    }
+
+    var button = document.getElementById('fold-geocode');
+    var spinner = document.getElementById('fold-geocode-spinner');
+    var error = document.getElementById('fold-geocode-error');
+
+    if (button) {
+        button.addEventListener('click', function() {
+            var data = { address: {} };
+            document.querySelectorAll('[name^="address["]').forEach(function(input) {
+                var match = input.name.match(/^address\[(\w+)\]$/);
+                if (match) {
+                    data.address[match[1]] = input.value;
+                }
+            });
+
+            var locationId = document.querySelector('input[name="locationId"]');
+            if (locationId) {
+                data.locationId = locationId.value;
+            }
+
+            spinner.classList.remove('hidden');
+            error.classList.add('hidden');
+
+            Craft.sendActionRequest('POST', 'fold/locations/geocode', { data: data })
+                .then(function(response) {
+                    if (response.data.success) {
+                        document.getElementById('lat').value = response.data.lat;
+                        document.getElementById('lng').value = response.data.lng;
+                    } else {
+                        error.textContent = response.data.message;
+                        error.classList.remove('hidden');
+                    }
+                })
+                .catch(function() {
+                    error.textContent = {{ 'The lookup failed.'|t('fold')|json_encode|raw }};
+                    error.classList.remove('hidden');
+                })
+                .finally(function() {
+                    spinner.classList.add('hidden');
+                });
+        });
+    }
+})();
+{% endjs %}

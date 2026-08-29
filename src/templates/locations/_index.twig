@@ -1,0 +1,36 @@
+{% extends '_layouts/elementindex' %}
+
+{% set title = 'Locations'|t('fold') %}
+{% set selectedSubnavItem = 'locations' %}
+{% set elementType = 'justinholtweb\\fold\\elements\\Location' %}
+
+{% block actionButton %}
+    <div class="flex">
+        {% if groups|length %}
+            <form method="post" accept-charset="UTF-8">
+                {{ csrfInput() }}
+                <input type="hidden" name="action" value="fold/locations/geocode-all">
+                <button type="submit" class="btn">{{ 'Geocode pending'|t('fold') }}</button>
+            </form>
+        {% endif %}
+
+        {% if canCreate %}
+            <a href="{{ url('fold/locations/new') }}" class="btn submit add icon">{{ 'New location'|t('fold') }}</a>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block sidebar %}
+    {{ parent() }}
+
+    {% if maxLocations is not null %}
+        <div class="pane" style="margin-top: 14px;">
+            <p class="light">
+                {{ '{remaining} of {max} locations remaining on Fold Lite.'|t('fold', {
+                    remaining: remaining,
+                    max: maxLocations,
+                }) }}
+            </p>
+        </div>
+    {% endif %}
+{% endblock %}

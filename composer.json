@@ -1,0 +1,66 @@
+{
+    "name": "justinholtweb/craft-fold",
+    "description": "A store locator for Craft CMS — mapped, searchable store locations with opening hours, radius search, and Craft Commerce inventory awareness.",
+    "version": "5.0.0",
+    "type": "craft-plugin",
+    "keywords": [
+        "craftcms",
+        "craft-plugin",
+        "store-locator",
+        "locations",
+        "map",
+        "maps",
+        "geocoding",
+        "leaflet",
+        "commerce"
+    ],
+    "license": "proprietary",
+    "homepage": "https://craft-fold.com",
+    "authors": [
+        {
+            "name": "Justin Holt",
+            "homepage": "https://justinholt.com"
+        }
+    ],
+    "support": {
+        "email": "justin@justinholt.com",
+        "issues": "https://github.com/justinholtweb/craft-fold/issues"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "require": {
+        "php": "^8.2",
+        "ext-json": "*",
+        "craftcms/cms": "^5.3.0"
+    },
+    "suggest": {
+        "craftcms/commerce": "Links locations to Commerce inventory locations and filters the locator by stock (Pro, ^5.0)."
+    },
+    "autoload": {
+        "psr-4": {
+            "justinholtweb\\fold\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "justinholtweb\\fold\\tests\\": "tests/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "craftcms/plugin-installer": true,
+            "yiisoft/yii2-composer": true
+        },
+        "sort-packages": true
+    },
+    "extra": {
+        "name": "Fold",
+        "handle": "fold",
+        "developer": "Justin Holt",
+        "developerUrl": "https://justinholt.com",
+        "documentationUrl": "https://github.com/justinholtweb/craft-fold/blob/main/README.md",
+        "changelogUrl": "https://raw.githubusercontent.com/justinholtweb/craft-fold/main/CHANGELOG.md",
+        "class": "justinholtweb\\fold\\Plugin",
+        "editions": ["lite", "pro"]
+    }
+}

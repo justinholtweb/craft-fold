@@ -1,0 +1,56 @@
+{% extends '_layouts/cp' %}
+
+{% set title = 'Location groups'|t('fold') %}
+{% set crumbs = [
+    { label: 'Settings'|t('app'), url: url('settings') },
+    { label: 'Fold'|t('fold'), url: url('settings/plugins/fold') },
+] %}
+
+{% block actionButton %}
+    {% if canCreate %}
+        <a href="{{ url('settings/fold/groups/new') }}" class="btn submit add icon">{{ 'New group'|t('fold') }}</a>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {% if not canCreate and maxGroups is not null %}
+        <p class="warning">
+            {{ 'Fold Lite supports {max} location group. Upgrade to Pro for more.'|t('fold', { max: maxGroups }) }}
+        </p>
+    {% endif %}
+
+    {% if groups|length %}
+        <table id="fold-groups" class="data fullwidth collapsible">
+            <thead>
+                <tr>
+                    <th scope="col">{{ 'Name'|t('app') }}</th>
+                    <th scope="col">{{ 'Handle'|t('app') }}</th>
+                    <th scope="col">{{ 'Sites'|t('app') }}</th>
+                    <td class="thin"></td>
+                </tr>
+            </thead>
+            <tbody>
+                {% for group in groups %}
+                    <tr data-id="{{ group.id }}" data-name="{{ group.name }}">
+                        <th scope="row" data-title="{{ 'Name'|t('app') }}">
+                            <a href="{{ url('settings/fold/groups/' ~ group.id) }}">{{ group.name }}</a>
+                        </th>
+                        <td data-title="{{ 'Handle'|t('app') }}"><code>{{ group.handle }}</code></td>
+                        <td data-title="{{ 'Sites'|t('app') }}">{{ group.getSiteSettings()|length }}</td>
+                        <td class="thin"><a class="delete icon" title="{{ 'Delete'|t('app') }}" role="button"></a></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>{{ 'No location groups yet. A group holds the field layout and URL settings for a kind of place — “Retail Stores”, “Service Centres”.'|t('fold') }}</p>
+    {% endif %}
+{% endblock %}
+
+{% js %}
+new Craft.AdminTable({
+    tableSelector: '#fold-groups',
+    deleteAction: 'fold/groups/delete',
+    confirmDeleteMessage: {{ 'Are you sure you want to delete “{name}” and all of its locations?'|t('fold')|json_encode|raw }},
+});
+{% endjs %}

@@ -1,0 +1,83 @@
+{% extends '_layouts/cp' %}
+
+{% set title = 'Searches'|t('fold') %}
+{% set selectedSubnavItem = 'searches' %}
+{% set crumbs = [{ label: 'Fold'|t('fold'), url: url('fold') }] %}
+
+{% block content %}
+    {% if not isPro %}
+        <p class="warning">{{ 'Search recording is a Pro feature.'|t('fold') }}</p>
+    {% elseif not logging %}
+        <p class="warning">
+            {{ 'Search recording is switched off.'|t('fold') }}
+            <a href="{{ url('settings/plugins/fold') }}">{{ 'Turn it on in settings'|t('fold') }}</a>.
+        </p>
+    {% endif %}
+
+    <h2>{{ 'Searches that found nothing'|t('fold') }}</h2>
+    <p class="light">{{ 'Since {date}. A town that people keep looking for and never find is the most useful thing a locator learns.'|t('fold', { date: since|date('medium') }) }}</p>
+
+    {% if empty|length %}
+        <table class="data fullwidth">
+            <thead>
+                <tr>
+                    <th scope="col">{{ 'Search term'|t('fold') }}</th>
+                    <th scope="col">{{ 'Times searched'|t('fold') }}</th>
+                    <th scope="col">{{ 'Placed at'|t('fold') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in empty %}
+                    <tr>
+                        <th scope="row">{{ row.term }}</th>
+                        <td>{{ row.searches }}</td>
+                        <td>
+                            {% if row.lat %}
+                                <code class="small light">{{ row.lat }}, {{ row.lng }}</code>
+                            {% else %}
+                                <span class="light">{{ 'Could not be placed'|t('fold') }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>{{ 'Nothing yet.'|t('fold') }}</p>
+    {% endif %}
+
+    <hr>
+
+    <h2>{{ 'Recent searches'|t('fold') }}</h2>
+
+    {% if recent|length %}
+        <table class="data fullwidth">
+            <thead>
+                <tr>
+                    <th scope="col">{{ 'Term'|t('fold') }}</th>
+                    <th scope="col">{{ 'Results'|t('fold') }}</th>
+                    <th scope="col">{{ 'Nearest'|t('fold') }}</th>
+                    <th scope="col">{{ 'When'|t('fold') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in recent %}
+                    <tr>
+                        <th scope="row">{{ row.term }}</th>
+                        <td>{{ row.resultCount }}</td>
+                        <td>{{ row.nearestDistance ? row.nearestDistance ~ ' ' ~ row.unit : '—' }}</td>
+                        <td>{{ row.dateCreated|datetime('short') }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <form method="post" accept-charset="UTF-8" style="margin-top: 14px;">
+            {{ csrfInput() }}
+            <input type="hidden" name="action" value="fold/searches/clear">
+            <button type="submit" class="btn">{{ 'Clear the log'|t('fold') }}</button>
+        </form>
+    {% else %}
+        <p>{{ 'Nothing recorded yet.'|t('fold') }}</p>
+    {% endif %}
+{% endblock %}

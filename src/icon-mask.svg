@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The solid form, for wherever Craft wants a filled mask rather than a stroked outline.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <path d="M6 26 L35 15 L65 26 L94 15 L94 74 L65 85 L35 74 L6 85 Z" fill="currentColor"/>
+</svg>

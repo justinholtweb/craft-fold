@@ -1,0 +1,217 @@
+/**
+ * Fold — locator styles.
+ *
+ * Deliberately small and deliberately overridable. Everything here is a single class selector at
+ * one level of specificity, uses custom properties for the handful of things a site will want to
+ * change, and sets no fonts and no brand colours — a store locator has to look like the site it
+ * is on, and a plugin stylesheet that fights the theme is a plugin stylesheet that gets deleted.
+ *
+ * The layout is a two-column grid that collapses to one on narrow screens, with the map first in
+ * the source on wide screens only via `order` — so the *reading* order stays list-then-map, which
+ * is the order that makes sense to a screen reader and to a search engine.
+ */
+
+.fold {
+    --fold-gap: 1.5rem;
+    --fold-radius: 6px;
+    --fold-border: #e2e4e8;
+    --fold-muted: #6b7280;
+    --fold-accent: #2563eb;
+    --fold-open: #15803d;
+    --fold-closed: #b91c1c;
+    --fold-map-height: 30rem;
+    --fold-list-height: 30rem;
+}
+
+.fold *,
+.fold *::before,
+.fold *::after {
+    box-sizing: border-box;
+}
+
+/* Search bar
+   ------------------------------------------------------------------------------------------- */
+
+.fold-search {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: flex-end;
+    margin-block-end: var(--fold-gap);
+}
+
+.fold-search__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1 1 14rem;
+}
+
+.fold-search__label {
+    font-size: 0.85em;
+    color: var(--fold-muted);
+}
+
+.fold-search input,
+.fold-search select {
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--fold-border);
+    border-radius: var(--fold-radius);
+    font: inherit;
+    width: 100%;
+}
+
+.fold-search button {
+    padding: 0.55rem 1rem;
+    border: 1px solid transparent;
+    border-radius: var(--fold-radius);
+    background: var(--fold-accent);
+    color: #fff;
+    font: inherit;
+    cursor: pointer;
+}
+
+.fold-search button[data-fold-locate] {
+    background: transparent;
+    color: inherit;
+    border-color: var(--fold-border);
+}
+
+.fold-status {
+    margin-block-end: 0.75rem;
+    color: var(--fold-muted);
+    /* Announced to screen readers when a search finishes, which is the only way a visitor who
+       cannot see the list knows anything happened. */
+    min-height: 1.2em;
+}
+
+/* Layout
+   ------------------------------------------------------------------------------------------- */
+
+.fold-layout {
+    display: grid;
+    gap: var(--fold-gap);
+    grid-template-columns: 1fr;
+}
+
+@media (min-width: 48rem) {
+    .fold-layout {
+        grid-template-columns: minmax(18rem, 24rem) 1fr;
+    }
+}
+
+.fold-results {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: var(--fold-list-height);
+    overflow-y: auto;
+}
+
+.fold-map {
+    min-height: var(--fold-map-height);
+    border-radius: var(--fold-radius);
+    overflow: hidden;
+    /* A visible box before the tiles arrive, so the page does not reflow when the map loads. */
+    background: #eef0f3;
+}
+
+.fold-map[hidden] {
+    display: none;
+}
+
+/* Results
+   ------------------------------------------------------------------------------------------- */
+
+.fold-result {
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--fold-border);
+    border-radius: var(--fold-radius);
+    margin-block-end: 0.6rem;
+    cursor: pointer;
+}
+
+.fold-result--active {
+    border-color: var(--fold-accent);
+    box-shadow: 0 0 0 1px var(--fold-accent);
+}
+
+.fold-result__name {
+    margin: 0 0 0.2rem;
+    font-size: 1.05em;
+}
+
+.fold-result__distance {
+    margin: 0 0 0.4rem;
+    color: var(--fold-muted);
+    font-size: 0.9em;
+}
+
+.fold-result__address {
+    margin: 0 0 0.4rem;
+}
+
+.fold-result__open {
+    margin: 0 0 0.4rem;
+    font-size: 0.9em;
+    font-weight: 600;
+}
+
+.fold-result__open--yes {
+    color: var(--fold-open);
+}
+
+.fold-result__open--no {
+    color: var(--fold-closed);
+}
+
+.fold-result__stock {
+    margin: 0 0 0.4rem;
+    font-size: 0.9em;
+}
+
+.fold-result__links {
+    margin: 0;
+    display: flex;
+    gap: 0.75rem;
+    font-size: 0.9em;
+}
+
+.fold-empty {
+    padding: 1rem;
+    color: var(--fold-muted);
+}
+
+/* Loading
+   ------------------------------------------------------------------------------------------- */
+
+.fold--loading .fold-results {
+    opacity: 0.55;
+    /* The old results stay legible and stay clickable-looking while the new ones arrive; blanking
+       the list mid-search is a flash of nothing on every keystroke-fast connection. */
+    transition: opacity 120ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fold--loading .fold-results {
+        transition: none;
+    }
+}
+
+/* Detail page
+   ------------------------------------------------------------------------------------------- */
+
+.fold-hours-table {
+    border-collapse: collapse;
+}
+
+.fold-hours-table th,
+.fold-hours-table td {
+    text-align: left;
+    padding: 0.2rem 1.25rem 0.2rem 0;
+    font-weight: normal;
+}
+
+.fold-hours-table th {
+    color: var(--fold-muted);
+}

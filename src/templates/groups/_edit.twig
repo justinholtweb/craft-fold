@@ -1,0 +1,119 @@
+{% extends '_layouts/cp' %}
+{% import '_includes/forms' as forms %}
+
+{% set title = isNew ? 'New location group'|t('fold') : group.name %}
+{% set fullPageForm = true %}
+{% set crumbs = [
+    { label: 'Settings'|t('app'), url: url('settings') },
+    { label: 'Fold'|t('fold'), url: url('settings/plugins/fold') },
+    { label: 'Location groups'|t('fold'), url: url('settings/fold/groups') },
+] %}
+
+{% block content %}
+    <input type="hidden" name="action" value="fold/groups/save">
+    {{ redirectInput('settings/fold/groups') }}
+    {% if group.id %}<input type="hidden" name="groupId" value="{{ group.id }}">{% endif %}
+
+    {{ forms.textField({
+        first: true,
+        label: 'Name'|t('app'),
+        id: 'name',
+        name: 'name',
+        value: group.name,
+        errors: group.getErrors('name'),
+        autofocus: true,
+        required: true,
+    }) }}
+
+    {{ forms.textField({
+        label: 'Handle'|t('app'),
+        id: 'handle',
+        name: 'handle',
+        class: 'code',
+        value: group.handle,
+        errors: group.getErrors('handle'),
+        required: true,
+    }) }}
+
+    {{ forms.colorField({
+        label: 'Marker colour'|t('fold'),
+        instructions: 'Used for this group’s pins on the map.'|t('fold'),
+        id: 'color',
+        name: 'color',
+        value: group.color,
+        errors: group.getErrors('color'),
+    }) }}
+
+    {{ forms.textField({
+        label: 'Default country'|t('fold'),
+        instructions: 'Two-letter country code new locations in this group start in.'|t('fold'),
+        id: 'defaultCountryCode',
+        name: 'defaultCountryCode',
+        class: 'code',
+        size: 4,
+        value: group.defaultCountryCode,
+        errors: group.getErrors('defaultCountryCode'),
+    }) }}
+
+    <hr>
+
+    <h2>{{ 'Site settings'|t('app') }}</h2>
+    <p class="light">{{ 'Give a group a URI format on a site and every location in it gets its own page there.'|t('fold') }}</p>
+
+    {% if group.getErrors('siteSettings') %}
+        <ul class="errors">
+            {% for error in group.getErrors('siteSettings') %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+    {% endif %}
+
+    {% for site in allSites %}
+        {% set settings = siteSettings[site.id] ?? null %}
+        <div class="pane">
+            <h3>{{ site.name }}</h3>
+
+            {{ forms.lightswitchField({
+                label: 'Available on this site'|t('fold'),
+                name: 'sites[' ~ site.id ~ '][enabled]',
+                on: settings is not null,
+                toggle: 'site-' ~ site.id ~ '-settings',
+            }) }}
+
+            <div id="site-{{ site.id }}-settings" class="{{ settings is null ? 'hidden' }}">
+                {{ forms.lightswitchField({
+                    label: 'Locations enabled by default'|t('fold'),
+                    name: 'sites[' ~ site.id ~ '][enabledByDefault]',
+                    on: settings ? settings.enabledByDefault : true,
+                }) }}
+
+                {{ forms.textField({
+                    label: 'Location URI format'|t('fold'),
+                    instructions: 'e.g. `stores/{slug}`. Leave blank for locations with no page of their own.'|t('fold'),
+                    class: 'code',
+                    name: 'sites[' ~ site.id ~ '][uriFormat]',
+                    value: settings ? settings.uriFormat : null,
+                }) }}
+
+                {{ forms.textField({
+                    label: 'Template'|t('app'),
+                    class: 'code',
+                    name: 'sites[' ~ site.id ~ '][template]',
+                    value: settings ? settings.template : null,
+                }) }}
+            </div>
+        </div>
+    {% endfor %}
+
+    <hr>
+
+    <h2>{{ 'Field layout'|t('app') }}</h2>
+
+    {{ forms.fieldLayoutDesignerField({
+        fieldLayout: group.getFieldLayout(),
+    }) }}
+{% endblock %}
+
+{% if isNew %}
+    {% js %}
+        new Craft.HandleGenerator('#name', '#handle');
+    {% endjs %}
+{% endif %}

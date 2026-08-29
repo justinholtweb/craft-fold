@@ -1,0 +1,212 @@
+{# Field names carry no `settings[…]` prefix: `craft\base\Plugin::settingsResponse()` runs this
+   template's output through `View::namespaceInputs(…, 'settings')`, so a name written as
+   `settings[foo]` here posts as `settings[settings][foo]` and saves nothing at all — the screen
+   looks perfect, Craft reports "Plugin settings saved", and every edit is silently discarded. #}
+{% import '_includes/forms' as forms %}
+
+{% set isPro = plugin.isPro() %}
+
+<h2>{{ 'Map'|t('fold') }}</h2>
+
+{{ forms.selectField({
+    label: 'Map provider'|t('fold'),
+    instructions: 'Leaflet with OpenStreetMap tiles needs no API key and is what a fresh install uses.'|t('fold'),
+    id: 'mapDriver',
+    name: 'mapDriver',
+    options: [
+        { label: 'Leaflet / OpenStreetMap'|t('fold'), value: 'leaflet' },
+        { label: 'Google Maps'|t('fold') ~ (isPro ? '' : ' — ' ~ 'Pro'|t('fold')), value: 'google', disabled: not isPro },
+        { label: 'Mapbox'|t('fold') ~ (isPro ? '' : ' — ' ~ 'Pro'|t('fold')), value: 'mapbox', disabled: not isPro },
+    ],
+    value: settings.mapDriver,
+    errors: settings.getErrors('mapDriver'),
+    toggle: true,
+    targetPrefix: 'map-',
+}) }}
+
+<div id="map-leaflet" class="{{ settings.mapDriver != 'leaflet' ? 'hidden' }}">
+    {{ forms.textField({
+        label: 'Tile URL'|t('fold'),
+        instructions: 'OpenStreetMap’s tiles are free and ask for attribution and modest traffic. A busy site should point this at its own tile service.'|t('fold'),
+        class: 'code',
+        name: 'leafletTileUrl',
+        value: settings.leafletTileUrl,
+    }) }}
+
+    {{ forms.textField({
+        label: 'Attribution'|t('fold'),
+        class: 'code',
+        name: 'leafletAttribution',
+        value: settings.leafletAttribution,
+    }) }}
+</div>
+
+<div id="map-google" class="{{ settings.mapDriver != 'google' ? 'hidden' }}">
+    {{ forms.autosuggestField({
+        label: 'Google Maps API key'|t('fold'),
+        name: 'googleApiKey',
+        value: settings.googleApiKey,
+        suggestEnvVars: true,
+    }) }}
+</div>
+
+<div id="map-mapbox" class="{{ settings.mapDriver != 'mapbox' ? 'hidden' }}">
+    {{ forms.autosuggestField({
+        label: 'Mapbox access token'|t('fold'),
+        name: 'mapboxAccessToken',
+        value: settings.mapboxAccessToken,
+        suggestEnvVars: true,
+    }) }}
+</div>
+
+<hr>
+
+<h2>{{ 'Geocoding'|t('fold') }}</h2>
+
+{{ forms.selectField({
+    label: 'Geocoding provider'|t('fold'),
+    instructions: 'Nominatim is OpenStreetMap’s own service: free, keyless, and limited to one request per second, which Fold respects.'|t('fold'),
+    name: 'geocoderDriver',
+    options: [
+        { label: 'Nominatim / OpenStreetMap'|t('fold'), value: 'nominatim' },
+        { label: 'Google'|t('fold') ~ (isPro ? '' : ' — ' ~ 'Pro'|t('fold')), value: 'google', disabled: not isPro },
+        { label: 'Mapbox'|t('fold') ~ (isPro ? '' : ' — ' ~ 'Pro'|t('fold')), value: 'mapbox', disabled: not isPro },
+        { label: 'None — enter coordinates by hand'|t('fold'), value: 'none' },
+    ],
+    value: settings.geocoderDriver,
+    errors: settings.getErrors('geocoderDriver'),
+}) }}
+
+{{ forms.lightswitchField({
+    label: 'Look up coordinates automatically'|t('fold'),
+    instructions: 'Queues a lookup whenever a location’s address changes.'|t('fold'),
+    name: 'autoGeocode',
+    on: settings.autoGeocode,
+}) }}
+
+{{ forms.textField({
+    label: 'Cache lookups for'|t('fold'),
+    instructions: 'Seconds. Front-end searches repeat constantly, and an uncached locator is a bill and a rate limit. 2592000 is thirty days.'|t('fold'),
+    type: 'number',
+    name: 'geocodeCacheDuration',
+    value: settings.geocodeCacheDuration,
+    errors: settings.getErrors('geocodeCacheDuration'),
+}) }}
+
+{{ forms.textField({
+    label: 'User agent'|t('fold'),
+    instructions: 'Sent to Nominatim, which blocks requests without one. Blank builds it from the site name and URL.'|t('fold'),
+    name: 'geocoderUserAgent',
+    value: settings.geocoderUserAgent,
+    placeholder: settings.getGeocoderUserAgent(),
+}) }}
+
+<hr>
+
+<h2>{{ 'Searching'|t('fold') }}</h2>
+
+{{ forms.selectField({
+    label: 'Distance unit'|t('fold'),
+    name: 'distanceUnit',
+    options: [
+        { label: 'Miles'|t('fold'), value: 'mi' },
+        { label: 'Kilometres'|t('fold'), value: 'km' },
+    ],
+    value: settings.distanceUnit,
+}) }}
+
+{{ forms.textField({
+    label: 'Default radius'|t('fold'),
+    type: 'number',
+    step: 'any',
+    name: 'defaultRadius',
+    value: settings.defaultRadius,
+    errors: settings.getErrors('defaultRadius'),
+}) }}
+
+{{ forms.editableTableField({
+    label: 'Radius options'|t('fold'),
+    instructions: 'The radii the built-in search box offers.'|t('fold'),
+    name: 'radiusOptions',
+    cols: {
+        radius: { heading: 'Radius'|t('fold'), type: 'number' },
+    },
+    rows: settings.getRadiusOptions()|map(r => { radius: r }),
+    addRowLabel: 'Add a radius'|t('fold'),
+}) }}
+
+{{ forms.textField({
+    label: 'Results per search'|t('fold'),
+    type: 'number',
+    name: 'defaultLimit',
+    value: settings.defaultLimit,
+    errors: settings.getErrors('defaultLimit'),
+}) }}
+
+{{ forms.textField({
+    label: 'Maximum results'|t('fold'),
+    instructions: 'A ceiling on what the public JSON endpoint will return, however large a limit is asked for.'|t('fold'),
+    type: 'number',
+    name: 'maxLimit',
+    value: settings.maxLimit,
+    errors: settings.getErrors('maxLimit'),
+}) }}
+
+{{ forms.lightswitchField({
+    label: 'Ask for the visitor’s location'|t('fold'),
+    instructions: 'Prompts the browser for a position on first load. Off by default — an unprompted permission dialog is a poor first impression.'|t('fold'),
+    name: 'requestBrowserLocation',
+    on: settings.requestBrowserLocation,
+}) }}
+
+{{ forms.lightswitchField({
+    label: 'Cluster markers'|t('fold') ~ (isPro ? '' : ' — ' ~ 'Pro'|t('fold')),
+    name: 'clusterMarkers',
+    on: settings.clusterMarkers,
+    disabled: not isPro,
+}) }}
+
+{{ forms.lightswitchField({
+    label: 'Record searches'|t('fold') ~ (isPro ? '' : ' — ' ~ 'Pro'|t('fold')),
+    instructions: 'Keeps what visitors searched for and how many results they got. The useful half is the searches that found nothing.'|t('fold'),
+    name: 'logSearches',
+    on: settings.logSearches,
+    disabled: not isPro,
+}) }}
+
+<hr>
+
+<h2>{{ 'Defaults'|t('fold') }}</h2>
+
+{{ forms.textField({
+    label: 'Default country'|t('fold'),
+    class: 'code',
+    size: 4,
+    name: 'defaultCountryCode',
+    value: settings.defaultCountryCode,
+    errors: settings.getErrors('defaultCountryCode'),
+}) }}
+
+<div class="flex">
+    {{ forms.textField({
+        label: 'Map centre latitude'|t('fold'),
+        name: 'defaultLat',
+        value: settings.defaultLat,
+        errors: settings.getErrors('defaultLat'),
+    }) }}
+
+    {{ forms.textField({
+        label: 'Map centre longitude'|t('fold'),
+        name: 'defaultLng',
+        value: settings.defaultLng,
+        errors: settings.getErrors('defaultLng'),
+    }) }}
+
+    {{ forms.textField({
+        label: 'Zoom'|t('fold'),
+        type: 'number',
+        name: 'defaultZoom',
+        value: settings.defaultZoom,
+        errors: settings.getErrors('defaultZoom'),
+    }) }}
+</div>

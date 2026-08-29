@@ -1,0 +1,87 @@
+{#
+  The ready-made locator.
+
+  Server-rendered on purpose: what is below is a complete, correct, linkable list of shops before
+  a single byte of JavaScript runs. The runtime enhances it — adds the map, replaces the list
+  asynchronously — but never has to create it.
+
+  To change any of this, copy this file to `templates/fold/_locator/locator.twig` in the site and
+  edit it there. Fold looks for the site's copy first.
+#}
+
+{% set strings = {
+    searching: 'Searching…'|t('fold'),
+    results: '{count} locations found'|t('fold'),
+    oneResult: '1 location found'|t('fold'),
+    someResults: 'Showing {count} of {total} locations'|t('fold'),
+    noResults: 'No locations found. Try a wider radius.'|t('fold'),
+    notFound: 'We couldn’t find “{term}”. Try a town, a postcode, or a full address.'|t('fold'),
+    error: 'The search didn’t work. Please try again.'|t('fold'),
+    open: 'Open now'|t('fold'),
+    closed: 'Closed now'|t('fold'),
+    directions: 'Directions'|t('fold'),
+    inStock: 'In stock'|t('fold'),
+    outOfStock: 'Out of stock'|t('fold'),
+    noGeolocation: 'This browser can’t share your location.'|t('fold'),
+    locationDenied: 'We couldn’t get your location.'|t('fold'),
+} %}
+
+<div class="fold"
+     data-fold-locator
+     data-fold-config="{{ config }}"
+     data-fold-strings="{{ strings|json_encode }}">
+
+    <form class="fold-search" data-fold-form method="get" action="">
+        <div class="fold-search__field">
+            <label class="fold-search__label" for="fold-q">{{ 'Town, postcode or address'|t('fold') }}</label>
+            <input type="search" id="fold-q" name="q" value="{{ term }}" autocomplete="postal-code">
+        </div>
+
+        {% set radiusOptions = settings.getRadiusOptions() %}
+        {% if radiusOptions|length > 1 %}
+            <div class="fold-search__field" style="flex: 0 0 9rem;">
+                <label class="fold-search__label" for="fold-radius">{{ 'Within'|t('fold') }}</label>
+                <select id="fold-radius" name="radius">
+                    {% for option in radiusOptions %}
+                        <option value="{{ option }}"{{ option == radius ? ' selected' : '' }}>
+                            {{ option }} {{ settings.distanceUnit }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        {% endif %}
+
+        {% if options.group is defined %}
+            <input type="hidden" name="group" value="{{ options.group }}">
+        {% endif %}
+
+        <button type="submit">{{ 'Search'|t('fold') }}</button>
+        <button type="button" data-fold-locate>{{ 'Use my location'|t('fold') }}</button>
+    </form>
+
+    {# `aria-live` so a visitor using a screen reader is told the results changed — an
+       asynchronously replaced list is otherwise a silent event. #}
+    <p class="fold-status" data-fold-status role="status" aria-live="polite">
+        {%- if result.originNotFound -%}
+            {{ 'We couldn’t find “{term}”. Try a town, a postcode, or a full address.'|t('fold', { term: term }) }}
+        {%- elseif result.locations|length -%}
+            {{ result.locations|length == 1
+                ? '1 location found'|t('fold')
+                : '{count} locations found'|t('fold', { count: result.locations|length }) }}
+        {%- elseif term -%}
+            {{ 'No locations found. Try a wider radius.'|t('fold') }}
+        {%- endif -%}
+    </p>
+
+    <div class="fold-layout">
+        <ol class="fold-results" data-fold-results>
+            {% for location in result.locations %}
+                {% include 'fold/_locator/_result' with { location: location, unit: result.unit } only %}
+            {% else %}
+                <li class="fold-empty">{{ 'No locations to show yet.'|t('fold') }}</li>
+            {% endfor %}
+        </ol>
+
+        <div class="fold-map" data-fold-map></div>
+    </div>
+</div>
