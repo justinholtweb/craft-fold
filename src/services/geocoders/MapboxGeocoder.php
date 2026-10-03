@@ -20,13 +20,13 @@ class MapboxGeocoder extends BaseGeocoder
 
     public function isConfigured(): bool
     {
-        return !empty($this->settings->mapboxAccessToken);
+        return !empty($this->settings->getMapboxAccessToken());
     }
 
     public function geocode(string $query, array $options = []): ?GeoPoint
     {
         $params = [
-            'access_token' => $this->settings->mapboxAccessToken,
+            'access_token' => $this->settings->getMapboxAccessToken(),
             'limit' => (int)($options['limit'] ?? 1),
         ];
 
@@ -48,7 +48,7 @@ class MapboxGeocoder extends BaseGeocoder
         $url = sprintf('%s/%s,%s.json', self::ENDPOINT, $lng, $lat);
 
         return $this->readFeature($this->getJson($url, [
-            'access_token' => $this->settings->mapboxAccessToken,
+            'access_token' => $this->settings->getMapboxAccessToken(),
             'limit' => 1,
         ]));
     }

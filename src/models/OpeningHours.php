@@ -54,6 +54,11 @@ class OpeningHours implements JsonSerializable
             }
         }
 
+        // In date order, whatever order they were entered in — a "holiday hours" list that puts
+        // Christmas Day before Christmas Eve looks like a mistake on the shop's own page. The keys
+        // are `Y-m-d`, so a string sort is a date sort.
+        ksort($this->exceptions);
+
         $note = trim((string)($config['note'] ?? ''));
         $this->note = $note !== '' ? $note : null;
     }

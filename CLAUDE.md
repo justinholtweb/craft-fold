@@ -106,7 +106,7 @@ No local PHP on this Mac. Everything runs inside the plugin-testing container:
 
 ```sh
 cd ~/Sites/plugin-testing
-ddev exec php /var/www/craft-fold/tests/integration/checks.php     # 84 checks
+ddev exec php /var/www/craft-fold/tests/integration/checks.php     # 99 checks
 ddev exec bash -c 'find /var/www/craft-fold/src -name "*.php" -print0 | xargs -0 -n1 php -l'
 ```
 

@@ -44,18 +44,22 @@
 <div id="map-google" class="{{ settings.mapDriver != 'google' ? 'hidden' }}">
     {{ forms.autosuggestField({
         label: 'Google Maps API key'|t('fold'),
+        instructions: 'Sent to the browser to draw the map, so it is public. Restrict it to your site’s HTTP referrers in the Google Cloud console.'|t('fold'),
         name: 'googleApiKey',
         value: settings.googleApiKey,
         suggestEnvVars: true,
+        errors: settings.getErrors('googleApiKey'),
     }) }}
 </div>
 
 <div id="map-mapbox" class="{{ settings.mapDriver != 'mapbox' ? 'hidden' }}">
     {{ forms.autosuggestField({
         label: 'Mapbox access token'|t('fold'),
+        instructions: 'A public token (starting pk.) — it is sent to the browser. Restrict it to your site’s URLs in your Mapbox account.'|t('fold'),
         name: 'mapboxAccessToken',
         value: settings.mapboxAccessToken,
         suggestEnvVars: true,
+        errors: settings.getErrors('mapboxAccessToken'),
     }) }}
 </div>
 
@@ -75,7 +79,19 @@
     ],
     value: settings.geocoderDriver,
     errors: settings.getErrors('geocoderDriver'),
+    toggle: true,
+    targetPrefix: 'geocoder-',
 }) }}
+
+<div id="geocoder-google" class="{{ settings.geocoderDriver != 'google' ? 'hidden' }}">
+    {{ forms.autosuggestField({
+        label: 'Google Geocoding API key'|t('fold'),
+        instructions: 'Used only by the server, never sent to the browser. Restrict it to your server’s IP address. Blank uses the map key, which then has to be left unrestricted.'|t('fold'),
+        name: 'googleGeocodingApiKey',
+        value: settings.googleGeocodingApiKey,
+        suggestEnvVars: true,
+    }) }}
+</div>
 
 {{ forms.lightswitchField({
     label: 'Look up coordinates automatically'|t('fold'),
@@ -152,6 +168,15 @@
     errors: settings.getErrors('maxLimit'),
 }) }}
 
+{{ forms.textField({
+    label: 'Searches per visitor per minute'|t('fold'),
+    instructions: 'The public search is anonymous, and every new term is a geocoding request. Visitors over the limit are asked to wait. 0 turns it off.'|t('fold'),
+    type: 'number',
+    name: 'searchRateLimit',
+    value: settings.searchRateLimit,
+    errors: settings.getErrors('searchRateLimit'),
+}) }}
+
 {{ forms.lightswitchField({
     label: 'Ask for the visitor’s location'|t('fold'),
     instructions: 'Prompts the browser for a position on first load. Off by default — an unprompted permission dialog is a poor first impression.'|t('fold'),
@@ -161,6 +186,7 @@
 
 {{ forms.lightswitchField({
     label: 'Cluster markers'|t('fold') ~ (isPro ? '' : ' — ' ~ 'Pro'|t('fold')),
+    instructions: 'Groups pins that overlap at the current zoom into a numbered bubble. Leaflet maps only; Google and Mapbox maps show every pin.'|t('fold'),
     name: 'clusterMarkers',
     on: settings.clusterMarkers,
     disabled: not isPro,
@@ -171,6 +197,24 @@
     instructions: 'Keeps what visitors searched for and how many results they got. The useful half is the searches that found nothing.'|t('fold'),
     name: 'logSearches',
     on: settings.logSearches,
+    disabled: not isPro,
+}) }}
+
+{{ forms.textField({
+    label: 'Keep searches for'|t('fold'),
+    instructions: 'Days. The log holds what visitors typed and roughly where they were (to about a kilometre), so mention it in your privacy notice. 0 keeps searches forever.'|t('fold'),
+    type: 'number',
+    name: 'searchLogRetentionDays',
+    value: settings.searchLogRetentionDays,
+    errors: settings.getErrors('searchLogRetentionDays'),
+    disabled: not isPro,
+}) }}
+
+{{ forms.lightswitchField({
+    label: 'Publish exact stock counts'|t('fold') ~ (isPro ? '' : ' — ' ~ 'Pro'|t('fold')),
+    instructions: 'Adds each shop’s available quantity to the JSON search results. Off, a stock search reports only in stock or out of stock, which is all the built-in locator needs and all a competitor should see.'|t('fold'),
+    name: 'exposeStockLevels',
+    on: settings.exposeStockLevels,
     disabled: not isPro,
 }) }}
 

@@ -26,7 +26,7 @@ class SearchesController extends Controller
             return false;
         }
 
-        $this->requirePermission(Plugin::PERMISSION_VIEW);
+        $this->requirePermission(Plugin::PERMISSION_SEARCHES);
 
         return true;
     }

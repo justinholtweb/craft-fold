@@ -22,8 +22,8 @@ JavaScript off, and enhanced by a small runtime when JavaScript is on.
 
 ## What you get
 
-- **Locations are elements.** A field layout per group, a URL and template per site, drafts,
-  revisions, the trash, element search, relations, and the element index with the columns a store
+- **Locations are elements.** A field layout per group, a URL and template per site, the
+  trash, element search, relations, and the element index with the columns a store
   list wants — address, coordinates, group, open-now.
 - **Radius search that scales.** An indexed bounding box does the elimination and a haversine
   does the sorting, both inside one query. Portable across MySQL and Postgres — no spatial types,
@@ -66,9 +66,9 @@ php craft plugin/install fold
 | Geocoding | Nominatim | + Google, Mapbox |
 | Radius search, hours, store pages, JSON API | ✓ | ✓ |
 | Commerce inventory link and stock filter | | ✓ |
-| CSV / JSON import and export | | ✓ |
+| CSV import, CSV and JSON export | | ✓ |
 | Search recording | | ✓ |
-| Marker clustering | | ✓ |
+| Marker clustering (Leaflet maps) | | ✓ |
 
 Lite is a complete locator for a small business, not a demo: everything that makes the locator
 *work* is in it. Pro is for the problems that arrive with scale.
@@ -185,14 +185,18 @@ GET /fold/search.json?q=28202&radius=25
 
 | Parameter | Meaning |
 |---|---|
-| `q` | A town, postcode, address, or a `lat,lng` pair |
+| `q` | A town, postcode, address, or a `lat,lng` pair (up to 100 characters) |
 | `lat`, `lng` | Coordinates, which skip geocoding entirely |
-| `radius`, `unit` | `mi` or `km`; omit the radius for no limit |
+| `radius`, `unit` | `mi` or `km`; clamped to the widest radius the site offers |
 | `limit`, `offset` | Paging, clamped to the configured maximum |
 | `group` | Restrict to a location group's handle |
 | `openNow` | Only shops open at the moment of the search |
-| `inStockOf` | A purchasable's ID (Pro + Commerce) |
+| `inStockOf` | A purchasable's ID (Pro + Commerce); adds `inStock` to each result |
 | `country` | Two-letter code to bias geocoding |
+
+The endpoint is anonymous, so it is limited: `searchRateLimit` searches per visitor per minute
+(30 by default; over it is a `429`), no unlimited radius (pass `radius: 0` from Twig for that),
+and stock reported as in or out rather than as a count unless `exposeStockLevels` is on.
 
 The response carries the locations, their distances, the geocoded origin, the map bounds, and —
 importantly — `originNotFound`, so a front end can tell "we couldn't find that place" apart from
@@ -210,6 +214,7 @@ php craft fold/locations/geocode --force
 php craft fold/locations/queue-geocoding                     # hand it to the queue instead
 php craft fold/commerce/sync --group=retail                  # create locations from Commerce
 php craft fold/commerce/locations                            # what's linked to what
+php craft fold/searches/purge --days=30                      # trim the search log now
 ```
 
 The importer reads the column names other systems export — `Store Name`, `address_1`, `ZIP`,
@@ -229,9 +234,20 @@ return [
     'defaultRadius' => 25,
     'defaultCountryCode' => 'US',
     'geocodeCacheDuration' => 2592000,
-    'googleApiKey' => '$GOOGLE_MAPS_KEY',
+    'googleApiKey' => '$GOOGLE_MAPS_KEY',             // browser: restrict by HTTP referrer
+    'googleGeocodingApiKey' => '$GOOGLE_GEOCODING_KEY', // server: restrict by IP
+    'searchRateLimit' => 30,
+    'searchLogRetentionDays' => 90,
 ];
 ```
+
+Keep the two Google keys separate. The map key is in your page source for anyone to copy, and a
+referrer-restricted key cannot geocode from a server, so one key for both has to be an
+unrestricted key in public.
+
+The search log (Pro, off by default) stores each search term, the searcher's position rounded to
+about a kilometre, the radius, and how many shops it found. It does not store IP addresses. Rows
+are deleted after `searchLogRetentionDays`, and reading the report needs its own permission.
 
 A note on the default geocoder: Nominatim is run by volunteers and asks for no more than one
 request per second and an identifying User-Agent. Fold does both, and caches every answer. A busy

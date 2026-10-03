@@ -1,0 +1,63 @@
+{#
+  Demo-site chrome for the Fold screenshots: a made-up chandlery chain, so the locator is seen on a
+  site that looks like a real one. Copied into the harness by tests/manual/seed-demo.php.
+#}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ title ?? 'Find a shop' }} — Tidewater Chandlery</title>
+    {{ head() }}
+    <style>
+        :root { --navy: #12304a; --sea: #1f7a8c; --sand: #f6f1e7; --ink: #1d2733; }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: var(--sand); color: var(--ink);
+               font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif; }
+        .site-head { background: var(--navy); color: #fff; }
+        .site-head .wrap { display: flex; align-items: center; gap: 2.5rem; height: 68px; }
+        .brand { font-weight: 700; font-size: 1.2rem; letter-spacing: .02em; display: flex; align-items: center; gap: .6rem; color: #fff; text-decoration: none; }
+        .brand i { display: inline-block; width: 26px; height: 26px; border-radius: 50%; border: 3px solid #8fd3df; }
+        .site-head nav { display: flex; gap: 1.6rem; font-size: .95rem; }
+        .site-head nav a { color: rgba(255,255,255,.75); text-decoration: none; }
+        .site-head nav a.on { color: #fff; border-bottom: 2px solid #8fd3df; padding-bottom: 3px; }
+        .wrap { max-width: 1240px; margin: 0 auto; padding: 0 28px; }
+        main.wrap { padding-top: 34px; padding-bottom: 60px; }
+        h1 { font-size: 2rem; margin: 0 0 .25rem; letter-spacing: -.01em; }
+        .sub { margin: 0 0 1.6rem; color: #5b6673; }
+        .panel { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 2px rgba(18,48,74,.08), 0 8px 24px rgba(18,48,74,.06); }
+
+        /* The locator, themed through Fold's own custom properties — nothing else. */
+        .fold { --fold-accent: var(--sea); --fold-map-height: 34rem; --fold-list-height: 34rem; --fold-radius: 8px; }
+        .fold-result__name a { color: var(--navy); text-decoration: none; }
+        .fold-result__links a { color: var(--sea); }
+    </style>
+</head>
+<body>
+<div id="site">
+    <header class="site-head">
+        <div class="wrap">
+            <a class="brand" href="/fold-demo"><i></i> Tidewater Chandlery</a>
+            <nav>
+                <a href="#">Rigging</a><a href="#">Electronics</a><a href="#">Safety</a><a href="#">Maintenance</a>
+                <a href="/fold-demo" class="{{ (navOn ?? 'shops') == 'shops' ? 'on' }}">Our shops</a>
+            </nav>
+        </div>
+    </header>
+    <main class="wrap">
+        {% block content %}{% endblock %}
+    </main>
+</div>
+{{ endBody() }}
+<script>
+    // Harness-only: other plugins installed here inject popups and cookie banners. Remove anything
+    // that is not this page, so screenshots show the locator and nothing else.
+    (function sweep() {
+        Array.prototype.forEach.call(document.body.children, function(el) {
+            if (el.id !== 'site' && el.tagName !== 'SCRIPT') { el.remove(); }
+        });
+        setTimeout(sweep, 250);
+    })();
+</script>
+</body>
+</html>

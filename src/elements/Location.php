@@ -17,6 +17,7 @@ use DateTime;
 use DateTimeInterface;
 use justinholtweb\fold\elements\db\LocationQuery;
 use justinholtweb\fold\helpers\Geo;
+use justinholtweb\fold\models\Edition;
 use justinholtweb\fold\models\LocationGroup;
 use justinholtweb\fold\models\OpeningHours;
 use justinholtweb\fold\Plugin;
@@ -376,7 +377,14 @@ class Location extends Element
             return false;
         }
 
-        return !$this->hasCoordinates() || $hash !== $this->geocodeHash;
+        if ($hash !== $this->geocodeHash) {
+            return true;
+        }
+
+        // Same address as last time. Missing coordinates only warrant another try if the last
+        // attempt did not already fail on exactly this address — retrying an unchanged address
+        // on every save is a slower way to get the same "not found".
+        return !$this->hasCoordinates() && $this->geocodeState !== self::GEOCODE_FAILED;
     }
 
     /** @return array{lat: float, lng: float}|null */
@@ -501,6 +509,24 @@ class Location extends Element
     public function beforeSave(bool $isNew): bool
     {
         if ($this->groupId === null) {
+            return false;
+        }
+
+        // The edition cap, enforced where every path ends up. `Locations::saveLocation()` checks
+        // it too, but Craft's own Duplicate action, `elements/create` and applying a fresh draft
+        // all reach `saveElement()` without passing through Fold's service. `firstSave` is the
+        // draft-apply case: the element already has an ID, but it is becoming a real location now.
+        if (
+            ($isNew || $this->firstSave)
+            && !$this->getIsDraft()
+            && !$this->getIsRevision()
+            && !$this->propagating
+            && !Plugin::getInstance()->locations->canCreateLocation()
+        ) {
+            $this->addError('title', Craft::t('fold', 'Fold Lite supports up to {max} locations. Upgrade to Pro for unlimited locations.', [
+                'max' => Edition::LITE_MAX_LOCATIONS,
+            ]));
+
             return false;
         }
 

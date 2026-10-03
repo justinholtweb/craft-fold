@@ -1,0 +1,10 @@
+{% extends 'fold-demo/_layout' %}
+{% set title = 'Find a shop' %}
+
+{% block content %}
+    <h1>Find a shop</h1>
+    <p class="sub">Fifteen chandleries from the Outer Banks to Charleston. Most open seven days.</p>
+    <div class="panel">
+        {{ craft.fold.locator({ group: 'tidewater' }) }}
+    </div>
+{% endblock %}

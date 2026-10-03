@@ -112,8 +112,14 @@ class Geocoder extends Component
             }
         }
 
+        // Not cached, so this would be a provider request. A visitor's request has to earn it;
+        // a refusal returns "not found" *uncached*, and the search falls back to a name match.
+        if (!$this->mayAskProvider($driver::driverName())) {
+            return null;
+        }
+
         try {
-            $point = $driver->geocode($query, $options);
+            $point = $this->throttled($driver::driverName(), fn() => $driver->geocode($query, $options));
         } catch (GeocodingException $e) {
             // A provider failure is *not* a miss. Caching it would keep answering "not found" for
             // a month after somebody fixed the API key.
@@ -280,6 +286,88 @@ class Geocoder extends Component
             (new DateTime())->modify('+' . $this->settings()->geocodeCacheDuration . ' seconds'),
         );
         $record->save(false);
+    }
+
+    /**
+     * Whether this request may spend a provider lookup.
+     *
+     * The CP, the console and the queue always may — they are the site's own people geocoding the
+     * site's own shops. A front-end request is a visitor, anonymous, and every new term they type
+     * is a request on somebody's bill or rate limit, so each visitor gets the same per-minute
+     * budget as the search endpoint. Cached terms never count: the cache is what is meant to
+     * answer the public.
+     */
+    private function mayAskProvider(string $driver): bool
+    {
+        $request = Craft::$app->getRequest();
+
+        if ($driver === Settings::GEOCODER_NONE || $request->getIsConsoleRequest() || $request->getIsCpRequest()) {
+            return true;
+        }
+
+        $limit = $this->settings()->searchRateLimit;
+
+        if ($limit <= 0) {
+            return true;
+        }
+
+        $cache = Craft::$app->getCache();
+        $key = sprintf('fold:geocode-rate:%s:%d', sha1((string)$request->getUserIP()), intdiv(time(), 60));
+        $count = (int)$cache->get($key) + 1;
+        $cache->set($key, $count, 60);
+
+        if ($count > $limit) {
+            Craft::warning('A visitor ran out of geocoding lookups for this minute.', Plugin::LOG_CATEGORY);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Runs a provider request, at most one per second site-wide for Nominatim.
+     *
+     * OpenStreetMap's policy is one request per second *from the site*, not per visitor, and the
+     * penalty for ignoring it is a ban that takes the CP's geocoding down with the locator. The
+     * queue job already spaces itself; this is the same promise for everything else. A request
+     * that cannot get the lock within two seconds gives up rather than holding a PHP worker.
+     *
+     * @template T
+     * @param callable(): T $fn
+     * @return T
+     * @throws GeocodingException
+     */
+    private function throttled(string $driver, callable $fn): mixed
+    {
+        if ($driver !== Settings::GEOCODER_NOMINATIM) {
+            return $fn();
+        }
+
+        $mutex = Craft::$app->getMutex();
+        $lock = 'fold-nominatim';
+
+        if (!$mutex->acquire($lock, 2)) {
+            throw new GeocodingException('nominatim: another lookup is in progress.');
+        }
+
+        try {
+            $cache = Craft::$app->getCache();
+            $last = (float)$cache->get('fold:nominatim:last');
+            $wait = $last + 1.0 - microtime(true);
+
+            if ($wait > 0) {
+                usleep((int)ceil($wait * 1000000));
+            }
+
+            try {
+                return $fn();
+            } finally {
+                $cache->set('fold:nominatim:last', microtime(true), 10);
+            }
+        } finally {
+            $mutex->release($lock);
+        }
     }
 
     private function settings(): Settings

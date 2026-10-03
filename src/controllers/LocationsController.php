@@ -32,6 +32,7 @@ class LocationsController extends Controller
             return false;
         }
 
+        $this->requireCpRequest();
         $this->requirePermission(Plugin::PERMISSION_VIEW);
 
         return true;
@@ -162,6 +163,18 @@ class LocationsController extends Controller
             $location->siteId = Craft::$app->getSites()->getCurrentSite()->id;
         }
 
+        // The words on a location are per-site, so editing them takes that site's permission —
+        // the same rule Craft applies to entries.
+        if (Craft::$app->getIsMultiSite()) {
+            $site = Craft::$app->getSites()->getSiteById((int)$location->siteId);
+
+            if ($site === null) {
+                throw new NotFoundHttpException('Site not found.');
+            }
+
+            $this->requirePermission('editSite:' . $site->uid);
+        }
+
         $location->groupId = (int)$request->getBodyParam('groupId', $location->groupId);
         $location->title = $request->getBodyParam('title', $location->title);
         $location->slug = $request->getBodyParam('slug', $location->slug);
@@ -173,11 +186,22 @@ class LocationsController extends Controller
         $location->setHours($this->readHours($request->getBodyParam('hours', [])));
         $location->setFieldValuesFromRequest('fields');
 
+        // Only touched when the form actually carried the field. On Lite, a lapsed Pro, or with
+        // Commerce uninstalled the select is not rendered, and reading its absence as "unlink"
+        // would quietly drop every link the moment somebody fixed a phone number.
         $commerceId = $request->getBodyParam('commerceInventoryLocationId');
-        $location->commerceInventoryLocationId = $commerceId !== '' && $commerceId !== null ? (int)$commerceId : null;
+
+        if ($commerceId !== null) {
+            $location->commerceInventoryLocationId = $commerceId !== '' ? (int)$commerceId : null;
+        }
 
         $this->applyAddress($location, (array)$request->getBodyParam('address', []));
-        $this->applyCoordinates($location, $request->getBodyParam('lat'), $request->getBodyParam('lng'));
+        $this->applyCoordinates(
+            $location,
+            $request->getBodyParam('lat'),
+            $request->getBodyParam('lng'),
+            $request->getBodyParam('coordinatesSource') === 'geocoder',
+        );
 
         // Commerce is the authority on a linked location's address, so the mirror runs after the
         // posted address has been applied and simply overwrites it. Editing the address of a
@@ -234,9 +258,10 @@ class LocationsController extends Controller
             ]);
         }
 
-        if ($location->id !== null) {
-            Craft::$app->getElements()->saveElement($location, false);
-        }
+        // Not saved here. The form puts these coordinates into its fields and *Save* persists
+        // them with everything else — validated, and through the Commerce mirror. Saving the
+        // half-typed address from this endpoint would skip both. The geocode is cached, so the
+        // lookup Save may queue for the new address is answered without a second request.
 
         return $this->asJson([
             'success' => true,
@@ -322,7 +347,11 @@ class LocationsController extends Controller
      * who has just dragged a pin onto the right side of a divided highway — which the geocoder
      * would get wrong again, in exactly the same way, every time.
      */
-    private function applyCoordinates(Location $location, mixed $lat, mixed $lng): void
+    /**
+     * @param bool $fromGeocoder The form's *Look up* filled these in, so they follow the address
+     *   like any geocode would — rather than being pinned as if somebody had typed them.
+     */
+    private function applyCoordinates(Location $location, mixed $lat, mixed $lng, bool $fromGeocoder = false): void
     {
         $hasLat = $lat !== null && $lat !== '';
         $hasLng = $lng !== null && $lng !== '';
@@ -334,13 +363,16 @@ class LocationsController extends Controller
         $lat = (float)$lat;
         $lng = (float)$lng;
 
-        if ($lat === $location->lat && $lng === $location->lng) {
+        // Unchanged hand-placed coordinates stay as they were. A lookup that lands on the same spot
+        // still counts, because it is how a pinned location goes back to following its address.
+        if (!$fromGeocoder && $lat === $location->lat && $lng === $location->lng) {
             return;
         }
 
         $location->lat = $lat;
         $location->lng = $lng;
-        $location->geocodeState = Location::GEOCODE_MANUAL;
+        $location->geocodeState = $fromGeocoder ? Location::GEOCODE_OK : Location::GEOCODE_MANUAL;
+        $location->geocodedAt = $fromGeocoder ? new \DateTime() : $location->geocodedAt;
         $location->geocodeError = null;
         $location->geocodeHash = $location->computeGeocodeHash();
     }

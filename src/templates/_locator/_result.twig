@@ -9,11 +9,13 @@
     id: location.id,
     title: location.title,
     url: location.url,
+    color: location.group.markerColor ?? null,
     lat: location.lat,
     lng: location.lng,
     address: location.getFormattedAddress({ html: false }),
     phone: location.phone,
     directionsUrl: location.getDirectionsUrl(),
+    inStock: inStock ?? null,
 }|json_encode }}">
     <h3 class="fold-result__name">
         {% if location.url %}
@@ -36,6 +38,12 @@
         <p class="fold-result__open fold-result__open--{{ location.isOpenNow() ? 'yes' : 'no' }}">
             {{ location.isOpenNow() ? 'Open now'|t('fold') : 'Closed now'|t('fold') }}
         </p>
+    {% endif %}
+
+    {# Rendered here as well as by the runtime, so a stock-filtered locator says so with scripting
+       off — the same true/false the JSON endpoint gives, never a count. #}
+    {% if (inStock ?? null) is not null %}
+        <p class="fold-result__stock">{{ inStock ? 'In stock'|t('fold') : 'Out of stock'|t('fold') }}</p>
     {% endif %}
 
     <p class="fold-result__links">

@@ -120,6 +120,19 @@
     display: none;
 }
 
+/* A group-coloured Leaflet pin. Replaces Leaflet's `.leaflet-div-icon` white box entirely, so the
+   SVG is all that shows. */
+.fold-pin {
+    background: none;
+    border: 0;
+}
+
+.fold-pin svg {
+    display: block;
+    overflow: visible;
+    filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.35));
+}
+
 /* Results
    ------------------------------------------------------------------------------------------- */
 

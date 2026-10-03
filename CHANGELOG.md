@@ -7,7 +7,7 @@ Initial release.
 ### Locations
 
 - `Location` element type with a per-group field layout, per-site URI formats and templates,
-  drafts, revisions, the trash, element search and permissions.
+  the trash, element search and permissions.
 - Addresses are `craft\elements\Address` elements — country-aware fields and native formatting,
   and the same kind of thing Commerce stores against an inventory location.
 - Opening hours with overnight ranges, dated exceptions, an hours note, and "open now" answered
@@ -30,6 +30,11 @@ Initial release.
 - `craft.fold.locator()` renders a complete server-rendered locator, enhanced by a zero-build
   JavaScript runtime.
 - Leaflet is bundled rather than loaded from a CDN.
+- Searches update the address bar with the same `q`/`lat`/`lng`/`radius` the server reads, so a
+  result is shareable and back/forward step through searches.
+- Pins take their location group's marker colour, on Leaflet, Google and Mapbox maps.
+- Marker clustering on Leaflet maps (Pro), with Leaflet.markercluster bundled and loaded only when
+  clustering is on.
 - `craft.fold.locations` element query and `craft.fold.search()` for building your own.
 - A Locations relation field type.
 
@@ -42,6 +47,23 @@ Initial release.
 
 ### Tools
 
-- CSV and JSON import and export that round-trip, with generous column-name matching.
+- CSV import, and CSV and JSON export, that round-trip — split shifts included — with generous
+  column-name matching.
 - Console commands for importing, exporting, geocoding and syncing.
 - Search recording, with a report of the searches that found nothing.
+
+### Security and privacy
+
+- The public search endpoint is rate-limited per visitor, caps the term length, validates the
+  country bias and clamps the radius, so an anonymous loop cannot run up a geocoding bill or
+  force a full-table scan.
+- Front-end geocoding has a per-visitor budget, and Nominatim is held to one request per second
+  site-wide, not only in the queue.
+- Separate browser and server Google keys. Every key setting accepts environment variables, and
+  secret Mapbox tokens are refused because the token is sent to the browser.
+- Stock searches report in or out of stock. Exact counts are opt-in, and purchasables resolve only
+  when enabled and for sale.
+- The search log rounds positions to about a kilometre, expires after 90 days by default, and has
+  its own permission.
+- CSV exports defuse spreadsheet formulas, and the importer reverses it.
+- The Lite location cap is enforced on every save path, including Craft's Duplicate action.

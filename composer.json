@@ -15,7 +15,6 @@
         "commerce"
     ],
     "license": "proprietary",
-    "homepage": "https://craft-fold.com",
     "authors": [
         {
             "name": "Justin Holt",
@@ -24,6 +23,8 @@
     ],
     "support": {
         "email": "justin@justinholt.com",
+        "docs": "https://justinholt.com/plugins/craft-fold/docs",
+        "source": "https://github.com/justinholtweb/craft-fold",
         "issues": "https://github.com/justinholtweb/craft-fold/issues"
     },
     "minimum-stability": "stable",
@@ -58,7 +59,7 @@
         "handle": "fold",
         "developer": "Justin Holt",
         "developerUrl": "https://justinholt.com",
-        "documentationUrl": "https://github.com/justinholtweb/craft-fold/blob/main/README.md",
+        "documentationUrl": "https://justinholt.com/plugins/craft-fold/docs",
         "changelogUrl": "https://raw.githubusercontent.com/justinholtweb/craft-fold/main/CHANGELOG.md",
         "class": "justinholtweb\\fold\\Plugin",
         "editions": ["lite", "pro"]

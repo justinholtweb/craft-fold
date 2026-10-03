@@ -95,16 +95,14 @@ class FoldVariable extends Behavior
         $view = Craft::$app->getView();
         $view->registerAssetBundle(LocatorAsset::class);
 
-        $request = Craft::$app->getRequest();
-
         // The initial state comes from the query string, so a locator URL is shareable and the
-        // back button works — which an entirely JavaScript-driven widget throws away.
-        $params = array_merge([
-            'q' => $request->getParam('q'),
-            'lat' => $request->getParam('lat'),
-            'lng' => $request->getParam('lng'),
-            'radius' => $request->getParam('radius'),
-        ], $options);
+        // back button works — which an entirely JavaScript-driven widget throws away. The query
+        // string is a visitor's to write, so it goes through the same gate as the JSON endpoint;
+        // the template's own options are trusted and win.
+        $params = array_merge(
+            Plugin::getInstance()->search->requestParams(['q', 'lat', 'lng', 'radius']),
+            $options,
+        );
 
         $result = Plugin::getInstance()->search->search(array_filter(
             $params,
@@ -152,7 +150,10 @@ class FoldVariable extends Behavior
             'zoom' => $settings->defaultZoom,
             'radiusOptions' => $settings->getRadiusOptions(),
             'defaultRadius' => $settings->defaultRadius,
-            'cluster' => $settings->clusterMarkers && Edition::allowsClustering($isPro),
+            // Leaflet only. Clustering Google or Mapbox markers would mean a second third-party
+            // library on the page (or, for Mapbox, redrawing every pin as a map layer), so for those
+            // drivers the flag is simply false and the runtime draws one pin per shop.
+            'cluster' => $driver === 'leaflet' && $settings->clusterMarkers && Edition::allowsClustering($isPro),
             'requestBrowserLocation' => $settings->requestBrowserLocation,
             'endpoint' => \craft\helpers\UrlHelper::siteUrl('fold/search.json'),
         ];
@@ -160,15 +161,15 @@ class FoldVariable extends Behavior
         if ($driver === 'leaflet') {
             $config['tileUrl'] = $settings->leafletTileUrl;
             $config['attribution'] = $settings->leafletAttribution;
-            $config += $this->leafletUrls();
+            $config += $this->leafletUrls($config['cluster']);
         }
 
         // Only the key the chosen driver actually needs is emitted. A Mapbox token in the page
         // source of a site that renders Google maps is a leaked credential for nothing.
         if ($driver === 'google') {
-            $config['apiKey'] = $settings->googleApiKey;
+            $config['apiKey'] = $settings->getGoogleApiKey();
         } elseif ($driver === 'mapbox') {
-            $config['accessToken'] = $settings->mapboxAccessToken;
+            $config['accessToken'] = $settings->getMapboxAccessToken();
         }
 
         return Json::encode(array_merge($config, $overrides));
@@ -184,9 +185,12 @@ class FoldVariable extends Behavior
      * computed from the path plus the *directory's* mtime, and editing a file inside a directory
      * does not change that — so a cached URL keeps pointing at the old contents after an update.
      *
-     * @return array{leafletJsUrl: string, leafletCssUrl: string, leafletImagePath: string}
+     * The clustering plugin's URLs are only emitted when clustering is on, so a page that does not
+     * cluster never names — let alone fetches — the files.
+     *
+     * @return array<string, mixed>
      */
-    private function leafletUrls(): array
+    private function leafletUrls(bool $cluster = false): array
     {
         $settings = $this->getSettings();
         $base = Craft::$app->getAssetManager()->getPublishedUrl(
@@ -194,10 +198,20 @@ class FoldVariable extends Behavior
             true,
         );
 
-        return [
+        $urls = [
             'leafletJsUrl' => $settings->leafletJsUrl ?: $base . '/' . LocatorAsset::LEAFLET_JS,
             'leafletCssUrl' => $settings->leafletCssUrl ?: $base . '/' . LocatorAsset::LEAFLET_CSS,
             'leafletImagePath' => $base . '/' . LocatorAsset::LEAFLET_IMAGES,
         ];
+
+        if ($cluster) {
+            $urls['clusterJsUrl'] = $settings->leafletClusterJsUrl ?: $base . '/' . LocatorAsset::CLUSTER_JS;
+            $urls['clusterCssUrls'] = [
+                $settings->leafletClusterCssUrl ?: $base . '/' . LocatorAsset::CLUSTER_CSS,
+                $settings->leafletClusterDefaultCssUrl ?: $base . '/' . LocatorAsset::CLUSTER_DEFAULT_CSS,
+            ];
+        }
+
+        return $urls;
     }
 }

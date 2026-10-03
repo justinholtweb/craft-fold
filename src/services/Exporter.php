@@ -42,7 +42,7 @@ class Exporter extends Component
         fputcsv($handle, array_merge(self::COLUMNS, OpeningHours::DAYS));
 
         foreach ($locations as $location) {
-            fputcsv($handle, $this->row($location));
+            fputcsv($handle, array_map([$this, 'csvCell'], $this->row($location)));
         }
 
         rewind($handle);
@@ -89,6 +89,24 @@ class Exporter extends Component
         }
 
         return (string)json_encode($rows, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * Defuses a cell a spreadsheet would run as a formula.
+     *
+     * Anybody who can edit a location — or name a Commerce inventory location — can otherwise
+     * put `=HYPERLINK(…)` in a title and have it execute on the admin who opens the export in
+     * Excel. A leading apostrophe makes it text; the importer strips it again, so a phone number
+     * like `+1 704…` survives the round trip. Numbers are left alone, or every longitude west of
+     * Greenwich would come back as text.
+     */
+    private function csvCell(mixed $value): mixed
+    {
+        if (!is_string($value) || $value === '' || is_numeric($value)) {
+            return $value;
+        }
+
+        return in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true) ? "'" . $value : $value;
     }
 
     private function row(Location $location): array

@@ -8,6 +8,7 @@ use Craft;
 use craft\base\Model;
 use craft\behaviors\FieldLayoutBehavior;
 use craft\models\FieldLayout;
+use craft\validators\ColorValidator;
 use craft\validators\HandleValidator;
 use craft\validators\UniqueValidator;
 use justinholtweb\fold\elements\Location;
@@ -35,7 +36,10 @@ class LocationGroup extends Model
     /** Shown behind the marker on the map and beside the group in the CP. */
     public ?string $color = null;
 
-    /** Marker icon key the front-end runtime looks up; null means the default pin. */
+    /**
+     * Reserved: a marker icon key. Stored and round-tripped through project config, but nothing
+     * reads it yet — the front-end runtime colours the pin from `$color` and has no icon set.
+     */
     public ?string $marker = null;
 
     /** Country new locations in this group start in; falls back to the plugin setting. */
@@ -110,6 +114,23 @@ class LocationGroup extends Model
         return $this->defaultCountryCode ?: Plugin::getInstance()->getSettings()->defaultCountryCode;
     }
 
+    /**
+     * The pin colour as the front end should receive it: `#rrggbb`, or null for the map's default.
+     *
+     * Normalized and checked again on the way out, not only on save, because the value also
+     * arrives through project config — and it is written into an inline SVG on a public page.
+     */
+    public function getMarkerColor(): ?string
+    {
+        if (!is_string($this->color) || $this->color === '') {
+            return null;
+        }
+
+        $color = ColorValidator::normalizeColor($this->color);
+
+        return preg_match('/^#[0-9a-f]{6}$/', $color) ? $color : null;
+    }
+
     public function getCpEditUrl(): string
     {
         return sprintf('settings/fold/groups/%s', $this->id ?? 'new');
@@ -121,6 +142,7 @@ class LocationGroup extends Model
             [['name', 'handle'], 'required'],
             [['name', 'handle'], 'string', 'max' => 255],
             [['color'], 'string', 'max' => 16],
+            [['color'], ColorValidator::class],
             [['marker'], 'string', 'max' => 64],
             [['defaultCountryCode'], 'string', 'max' => 2],
             [

@@ -35,6 +35,9 @@ use Throwable;
  */
 class Commerce extends Component
 {
+    /** @var array<int, array|null> Inventory levels by purchasable ID, for this request. */
+    private array $_levels = [];
+
     private ?bool $_available = null;
 
     /** Whether Commerce is installed and running. */
@@ -161,9 +164,17 @@ class Commerce extends Component
             return null;
         }
 
-        try {
-            $levels = $this->commerce()->getInventory()->getInventoryLevelsForPurchasable($purchasable);
-        } catch (Throwable $e) {
+        // Memoised per purchasable: a results page asks this once per location, and the levels do
+        // not change between the first row and the two-hundredth.
+        $levels = $this->_levels[$purchasable->id] ??= (function() use ($purchasable) {
+            try {
+                return $this->commerce()->getInventory()->getInventoryLevelsForPurchasable($purchasable);
+            } catch (Throwable $e) {
+                return null;
+            }
+        })();
+
+        if ($levels === null) {
             return null;
         }
 
@@ -290,8 +301,20 @@ class Commerce extends Component
             return null;
         }
 
+        // An ID arrives from a public query string, so it is resolved the way a visitor would see
+        // it: enabled, in the current site. Otherwise a loop over IDs reads stock for products
+        // that are disabled, unreleased or not for sale.
         if (is_numeric($purchasable)) {
-            $purchasable = Craft::$app->getElements()->getElementById((int)$purchasable);
+            $purchasable = Craft::$app->getElements()->getElementById(
+                (int)$purchasable,
+                null,
+                Craft::$app->getSites()->getCurrentSite()->id,
+                ['status' => 'enabled'],
+            );
+
+            if ($purchasable !== null && isset($purchasable->availableForPurchase) && !$purchasable->availableForPurchase) {
+                return null;
+            }
         }
 
         // `interface_exists()` first, because the `instanceof` below is only *safe* without

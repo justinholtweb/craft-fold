@@ -32,4 +32,13 @@ class LocatorAsset extends AssetBundle
     public const LEAFLET_JS = 'vendor/leaflet/leaflet.js';
     public const LEAFLET_CSS = 'vendor/leaflet/leaflet.css';
     public const LEAFLET_IMAGES = 'vendor/leaflet/images/';
+
+    /**
+     * Leaflet.markercluster (MIT), for Pro's marker clustering. Loaded after Leaflet, and only when
+     * clustering is on — it is a plugin onto `window.L`, so it works the same whether Leaflet came
+     * from the bundled copy or from a CDN.
+     */
+    public const CLUSTER_JS = 'vendor/leaflet.markercluster/leaflet.markercluster.js';
+    public const CLUSTER_CSS = 'vendor/leaflet.markercluster/MarkerCluster.css';
+    public const CLUSTER_DEFAULT_CSS = 'vendor/leaflet.markercluster/MarkerCluster.Default.css';
 }

@@ -66,6 +66,21 @@
         load: function(config) {
             return loadStyle(config.leafletCssUrl).then(function() {
                 return loadScript(config.leafletJsUrl);
+            }).then(function() {
+                if (!config.cluster || !config.clusterJsUrl || (window.L && window.L.markerClusterGroup)) {
+                    return;
+                }
+
+                // Clustering is a plugin onto `window.L`, so it can only load once Leaflet has —
+                // wherever Leaflet came from. If it will not load, the map still draws, one pin per
+                // shop: losing the clusters is a cosmetic failure, losing the map is not.
+                (config.clusterCssUrls || []).forEach(loadStyle);
+
+                return loadScript(config.clusterJsUrl).catch(function(error) {
+                    if (window.console) {
+                        window.console.warn(error);
+                    }
+                });
             });
         },
 
@@ -93,9 +108,14 @@
                 map.scrollWheelZoom.enable();
             });
 
+            var markers = config.cluster && L.markerClusterGroup
+                ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 50 })
+                : L.layerGroup();
+
             return {
                 map: map,
-                markers: L.layerGroup().addTo(map),
+                markers: markers.addTo(map),
+                clustered: !!(config.cluster && L.markerClusterGroup),
             };
         },
 
@@ -104,33 +124,72 @@
             handle.markers.clearLayers();
             handle.byId = {};
 
+            var markers = [];
+
             locations.forEach(function(location) {
                 if (location.lat === null || location.lng === null) {
                     return;
                 }
 
-                var marker = L.marker([location.lat, location.lng], {
+                var options = {
                     title: location.title,
                     alt: location.title,
-                });
+                };
+                var color = safeColor(location.color);
+
+                // A group colour gets a drawn pin the same size and anchor as Leaflet's default
+                // image, so coloured and uncoloured groups line up on the same map. No colour
+                // keeps Leaflet's own marker, untouched.
+                if (color) {
+                    options.icon = L.divIcon({
+                        className: 'fold-pin',
+                        html: pinSvg(color),
+                        iconSize: [25, 41],
+                        iconAnchor: [12.5, 41],
+                        popupAnchor: [0, -34],
+                    });
+                }
+
+                var marker = L.marker([location.lat, location.lng], options);
 
                 marker.bindPopup(popupHtml(location));
                 marker.on('click', function() {
                     onSelect(location.id);
                 });
 
-                marker.addTo(handle.markers);
+                markers.push(marker);
                 handle.byId[location.id] = marker;
             });
+
+            // In bulk when clustering: the cluster group recomputes once rather than per pin.
+            if (handle.markers.addLayers) {
+                handle.markers.addLayers(markers);
+            } else {
+                markers.forEach(function(marker) {
+                    handle.markers.addLayer(marker);
+                });
+            }
         },
 
         focus: function(handle, id) {
             var marker = handle.byId && handle.byId[id];
 
-            if (marker) {
-                handle.map.setView(marker.getLatLng(), Math.max(handle.map.getZoom(), 14));
-                marker.openPopup();
+            if (!marker) {
+                return;
             }
+
+            // A pin inside a cluster is not on the map, so it has no popup to open until the
+            // cluster has been zoomed apart; the plugin does that, then hands it back.
+            if (handle.clustered && handle.markers.zoomToShowLayer) {
+                handle.markers.zoomToShowLayer(marker, function() {
+                    marker.openPopup();
+                });
+
+                return;
+            }
+
+            handle.map.setView(marker.getLatLng(), Math.max(handle.map.getZoom(), 14));
+            marker.openPopup();
         },
 
         fitBounds: function(handle, bounds) {
@@ -187,11 +246,27 @@
                     return;
                 }
 
-                var marker = new window.google.maps.Marker({
+                var options = {
                     position: { lat: location.lat, lng: location.lng },
                     map: handle.map,
                     title: location.title,
-                });
+                };
+                var color = safeColor(location.color);
+
+                // A vector symbol, so the colour needs no image and no extra library.
+                if (color) {
+                    options.icon = {
+                        path: PIN_PATH,
+                        fillColor: color,
+                        fillOpacity: 1,
+                        strokeColor: PIN_STROKE,
+                        strokeWeight: 1,
+                        scale: 1,
+                        anchor: new window.google.maps.Point(12.5, 41),
+                    };
+                }
+
+                var marker = new window.google.maps.Marker(options);
 
                 marker.addListener('click', function() {
                     handle.info.setContent(popupHtml(location));
@@ -269,7 +344,8 @@
                 // Mapbox takes coordinates longitude first. Every other map API here takes them
                 // latitude first, and getting it wrong puts a shop in Charlotte off the coast of
                 // Somalia — which is at least obvious, unlike most coordinate bugs.
-                var marker = new window.mapboxgl.Marker()
+                var color = safeColor(location.color);
+                var marker = new window.mapboxgl.Marker(color ? { color: color } : {})
                     .setLngLat([location.lng, location.lat])
                     .setPopup(new window.mapboxgl.Popup().setHTML(popupHtml(location)))
                     .addTo(handle.map);
@@ -310,7 +386,27 @@
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    /**
+     * The group colour, if it is one. The server already normalizes it to `#rrggbb`; checking again
+     * here costs nothing and means a hand-built endpoint response cannot inject markup through it.
+     */
+    function safeColor(value) {
+        return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? value : null;
+    }
+
+    /** A teardrop pin on a 25×41 box — the size and point of Leaflet's default marker image. */
+    var PIN_PATH = 'M12.5 0C5.6 0 0 5.6 0 12.5c0 9.4 12.5 28.5 12.5 28.5S25 21.9 25 12.5C25 5.6 19.4 0 12.5 0z';
+    var PIN_STROKE = 'rgba(0,0,0,0.35)';
+
+    function pinSvg(color) {
+        return '<svg xmlns="http://www.w3.org/2000/svg" width="25" height="41" viewBox="0 0 25 41" aria-hidden="true" focusable="false">'
+            + '<path d="' + PIN_PATH + '" fill="' + color + '" stroke="' + PIN_STROKE + '" stroke-width="1"/>'
+            + '<circle cx="12.5" cy="12.5" r="4.5" fill="#fff"/>'
+            + '</svg>';
     }
 
     function popupHtml(location) {
@@ -354,9 +450,9 @@
             html += '<p class="fold-result__open fold-result__open--no">' + escapeHtml(strings.closed) + '</p>';
         }
 
-        if (typeof location.availableStock === 'number') {
+        if (typeof location.inStock === 'boolean') {
             html += '<p class="fold-result__stock">' + escapeHtml(
-                location.availableStock > 0 ? strings.inStock : strings.outOfStock
+                location.inStock ? strings.inStock : strings.outOfStock
             ) + '</p>';
         }
 
@@ -379,6 +475,19 @@
     // The locator
     // ---------------------------------------------------------------------------------------
 
+    /**
+     * The query-string parameters `craft.fold.locator()` reads on the server. Writing exactly these
+     * into the address bar after a search is what makes the URL shareable: whoever opens it gets
+     * the same results rendered in Twig, with or without JavaScript.
+     */
+    var URL_PARAMS = ['q', 'lat', 'lng', 'radius'];
+
+    /**
+     * A page has one address bar and the server applies its query string to every locator on the
+     * page, so only the first locator writes to it.
+     */
+    var urlOwner = null;
+
     function Locator(root) {
         this.root = root;
         this.config = JSON.parse(root.getAttribute('data-fold-config') || '{}');
@@ -393,6 +502,7 @@
         this.request = 0;
 
         this.bind();
+        this.initHistory();
         this.initMap();
     }
 
@@ -426,6 +536,154 @@
         }
     };
 
+    /**
+     * Keeps the address bar in step with the results.
+     *
+     * Each search the visitor runs adds a history entry carrying the same `q`/`lat`/`lng`/`radius`
+     * the server reads, so the URL can be copied and the back button steps through searches. Going
+     * back to the page as it was loaded puts the server-rendered list back exactly as it was —
+     * from a copy taken here, not by asking the endpoint to reproduce it.
+     */
+    Locator.prototype.initHistory = function() {
+        var self = this;
+
+        this.syncUrl = !urlOwner
+            && this.config.syncUrl !== false
+            && !!(window.history && window.history.pushState && window.URLSearchParams);
+
+        if (!this.syncUrl) {
+            return;
+        }
+
+        urlOwner = this;
+        this.initialKey = urlKey(window.location.search);
+        this.currentKey = this.initialKey;
+
+        // A copy, read without touching the page.
+        this.snapshot = {
+            list: this.list ? this.list.innerHTML : null,
+            status: this.status ? this.status.textContent : null,
+            q: this.fieldValue('q'),
+            radius: this.fieldValue('radius'),
+        };
+
+        window.addEventListener('popstate', function() {
+            self.onPopState();
+        });
+    };
+
+    Locator.prototype.fieldValue = function(name) {
+        var field = this.form && this.form.elements[name];
+
+        return field && typeof field.value === 'string' ? field.value : null;
+    };
+
+    Locator.prototype.setFieldValue = function(name, value) {
+        var field = this.form && this.form.elements[name];
+
+        if (field && typeof field.value === 'string' && value !== null) {
+            field.value = value;
+        }
+    };
+
+    /** Writes a finished search into the address bar, as a new history entry. */
+    Locator.prototype.pushUrl = function(params) {
+        // Everything else already in the query string is the site's, and stays.
+        var query = new URLSearchParams(window.location.search);
+
+        URL_PARAMS.forEach(function(name) {
+            var value = params.get(name);
+            query.delete(name);
+
+            if (value !== null && value !== '') {
+                query.set(name, value);
+            }
+        });
+
+        var search = query.toString();
+        var key = urlKey(search);
+
+        // The same search again is not a new place to go back to.
+        if (key === this.currentKey) {
+            return;
+        }
+
+        this.currentKey = key;
+        window.history.pushState(
+            { fold: true },
+            '',
+            window.location.pathname + (search ? '?' + search : '') + window.location.hash
+        );
+    };
+
+    Locator.prototype.onPopState = function() {
+        var key = urlKey(window.location.search);
+
+        // `popstate` also fires for a change of `#fragment`, which is not a different search.
+        if (key === this.currentKey) {
+            return;
+        }
+
+        this.currentKey = key;
+
+        if (key === this.initialKey) {
+            this.restoreSnapshot();
+
+            return;
+        }
+
+        var query = new URLSearchParams(window.location.search);
+        var extra = {};
+
+        this.setFieldValue('q', query.get('q') || '');
+        this.setFieldValue('radius', query.get('radius') || this.snapshot.radius);
+
+        if (query.get('lat') && query.get('lng')) {
+            extra.lat = query.get('lat');
+            extra.lng = query.get('lng');
+        }
+
+        this.search(extra, { fromHistory: true });
+    };
+
+    /** Back to the page as the server rendered it. */
+    Locator.prototype.restoreSnapshot = function() {
+        // Anything still in flight is now stale.
+        this.request++;
+        this.root.classList.remove('fold--loading');
+
+        if (this.list && this.snapshot.list !== null) {
+            this.list.innerHTML = this.snapshot.list;
+        }
+
+        if (this.status && this.snapshot.status !== null) {
+            this.status.textContent = this.snapshot.status;
+        }
+
+        this.setFieldValue('q', this.snapshot.q);
+        this.setFieldValue('radius', this.snapshot.radius);
+        this.drawDomMarkers();
+    };
+
+    /** Markers for whatever results are in the list now, read from the server-rendered DOM. */
+    Locator.prototype.drawDomMarkers = function() {
+        var self = this;
+
+        if (!this.handle) {
+            return;
+        }
+
+        var locations = this.locationsFromDom();
+
+        this.driver.setMarkers(this.handle, locations, function(id) {
+            self.highlight(id);
+        });
+
+        if (locations.length) {
+            this.driver.fitBounds(this.handle, this.boundsOf(locations));
+        }
+    };
+
     Locator.prototype.initMap = function() {
         var self = this;
 
@@ -439,14 +697,7 @@
             // The server-rendered list is the first set of markers. Drawn from the DOM rather
             // than re-fetched, so the map matches the list the visitor is already reading and the
             // page costs no request to become useful.
-            var initial = self.locationsFromDom();
-
-            if (initial.length) {
-                self.driver.setMarkers(self.handle, initial, function(id) {
-                    self.highlight(id);
-                });
-                self.driver.fitBounds(self.handle, self.boundsOf(initial));
-            }
+            self.drawDomMarkers();
 
             if (self.config.requestBrowserLocation) {
                 self.useBrowserLocation(true);
@@ -511,8 +762,14 @@
         return params;
     };
 
-    Locator.prototype.search = function(extra) {
+    /**
+     * @param {Object} [extra] Parameters that win over the form's fields.
+     * @param {Object} [options] `fromHistory: true` for a search replaying a back/forward step,
+     *     which must not add a history entry of its own.
+     */
+    Locator.prototype.search = function(extra, options) {
         var self = this;
+        var fromHistory = !!(options && options.fromHistory);
         var params = this.params(extra);
 
         // Every request carries a sequence number and only the newest one is allowed to write to
@@ -527,6 +784,19 @@
             headers: { Accept: 'application/json' },
         })
             .then(function(response) {
+                // Over the per-visitor search limit. Not "no shops found", and not a reason to
+                // clear what is on screen: the previous results stay, and the server's own
+                // message (translated, with the wait in it) goes in the status line.
+                if (response.status === 429) {
+                    return response.json().catch(function() {
+                        return {};
+                    }).then(function(body) {
+                        var error = new Error('Fold search rate-limited');
+                        error.foldMessage = body && typeof body.message === 'string' ? body.message : null;
+                        throw error;
+                    });
+                }
+
                 if (!response.ok) {
                     throw new Error('Fold search failed: ' + response.status);
                 }
@@ -539,6 +809,12 @@
                 }
 
                 self.render(data);
+
+                // Only once the results are on the page — a failed search leaves both the list
+                // and the address bar as they were.
+                if (self.syncUrl && !fromHistory) {
+                    self.pushUrl(params);
+                }
             })
             .catch(function(error) {
                 if (ticket !== self.request) {
@@ -549,7 +825,9 @@
                     window.console.warn(error);
                 }
 
-                self.setStatus(self.strings.error || '');
+                // `setStatus` writes textContent, so the server's message is shown as text, never
+                // parsed as markup.
+                self.setStatus(error.foldMessage || self.strings.error || '');
             })
             .finally(function() {
                 if (ticket === self.request) {
@@ -670,6 +948,15 @@
             { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 }
         );
     };
+
+    /** The locator's own parameters from a query string, in a fixed order, for comparison. */
+    function urlKey(search) {
+        var query = new URLSearchParams(search);
+
+        return URL_PARAMS.map(function(name) {
+            return name + '=' + (query.get(name) || '');
+        }).join('&');
+    }
 
     Fold.init = function(root) {
         if (root.foldLocator) {

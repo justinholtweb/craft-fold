@@ -6,6 +6,7 @@ namespace justinholtweb\fold\models;
 
 use Craft;
 use craft\base\Model;
+use craft\helpers\App;
 use justinholtweb\fold\helpers\Geo;
 
 /**
@@ -33,7 +34,22 @@ class Settings extends Model
     /** Which service turns an address into coordinates. */
     public string $geocoderDriver = self::GEOCODER_NOMINATIM;
 
+    /**
+     * The Google key the *browser* uses to draw the map. It is printed in the page source, so it
+     * must be restricted to the site's HTTP referrers in the Google Cloud console.
+     */
     public ?string $googleApiKey = null;
+
+    /**
+     * The Google key the *server* uses to geocode.
+     *
+     * Separate because a referrer-restricted key cannot be used server-side, and an unrestricted
+     * key in page source is somebody else's free Geocoding API. Restrict this one by IP. Empty
+     * falls back to `googleApiKey`, which works but means shipping an unrestricted key.
+     */
+    public ?string $googleGeocodingApiKey = null;
+
+    /** A Mapbox *public* (`pk.`) token — it is sent to the browser. */
     public ?string $mapboxAccessToken = null;
 
     /**
@@ -55,6 +71,15 @@ class Settings extends Model
      */
     public ?string $leafletJsUrl = null;
     public ?string $leafletCssUrl = null;
+
+    /**
+     * Load Leaflet.markercluster from somewhere other than the bundled copy. Only used when
+     * clustering is on. The second stylesheet is the plugin's default cluster bubbles; point it
+     * at your own to restyle them, or at an empty file to style them entirely in the site's CSS.
+     */
+    public ?string $leafletClusterJsUrl = null;
+    public ?string $leafletClusterCssUrl = null;
+    public ?string $leafletClusterDefaultCssUrl = null;
 
     /** Miles or kilometres, everywhere Fold says a distance. */
     public string $distanceUnit = Geo::UNIT_MI;
@@ -101,7 +126,30 @@ class Settings extends Model
     /** Record what visitors searched for and how many results they got (Pro). */
     public bool $logSearches = false;
 
-    /** Group markers that overlap at the current zoom (Pro). */
+    /**
+     * Days a search log row is kept. Rows are a visitor's search term and roughly where they
+     * were, which is personal data in most of the places Fold will be installed; 0 keeps them
+     * forever.
+     */
+    public int $searchLogRetentionDays = 90;
+
+    /**
+     * Searches a single visitor (IP address) may make through the public endpoint per minute.
+     *
+     * The endpoint is anonymous and every new term is a geocoder request — a bill on Google, an
+     * IP ban on Nominatim. 0 turns the limit off, for a site that rate-limits at the edge.
+     */
+    public int $searchRateLimit = 30;
+
+    /**
+     * Publish exact stock counts in the JSON endpoint (Pro + Commerce).
+     *
+     * Off by default: "in stock" is what a locator needs, and exact counts per shop are a
+     * competitor's inventory report for the price of a loop.
+     */
+    public bool $exposeStockLevels = false;
+
+    /** Group markers that overlap at the current zoom (Pro; Leaflet maps only). */
     public bool $clusterMarkers = true;
 
     /** Ask the browser for the visitor's position, with their permission, on first load. */
@@ -120,6 +168,14 @@ class Settings extends Model
             [['defaultLng'], 'number', 'min' => -180, 'max' => 180],
             [['geocodeCacheDuration'], 'integer', 'min' => 0],
             [['defaultCountryCode'], 'string', 'max' => 2],
+            [['searchLogRetentionDays', 'searchRateLimit'], 'integer', 'min' => 0],
+            [['mapboxAccessToken'], function(string $attribute) {
+                // A secret token in a page's source is a leaked secret. Mapbox's own guidance is
+                // that only `pk.` tokens belong in a browser.
+                if (str_starts_with((string)App::parseEnv($this->$attribute), 'sk.')) {
+                    $this->addError($attribute, Craft::t('fold', 'Use a public (pk.) token — this one is sent to the browser.'));
+                }
+            }],
         ];
     }
 
@@ -129,6 +185,7 @@ class Settings extends Model
             'mapDriver' => Craft::t('fold', 'Map provider'),
             'geocoderDriver' => Craft::t('fold', 'Geocoding provider'),
             'googleApiKey' => Craft::t('fold', 'Google Maps API key'),
+            'googleGeocodingApiKey' => Craft::t('fold', 'Google Geocoding API key'),
             'mapboxAccessToken' => Craft::t('fold', 'Mapbox access token'),
             'leafletTileUrl' => Craft::t('fold', 'Tile URL'),
             'distanceUnit' => Craft::t('fold', 'Distance unit'),
@@ -136,6 +193,32 @@ class Settings extends Model
             'defaultLimit' => Craft::t('fold', 'Results per search'),
             'defaultCountryCode' => Craft::t('fold', 'Default country'),
         ];
+    }
+
+    /** The browser's Google key, environment variables resolved. */
+    public function getGoogleApiKey(): ?string
+    {
+        return App::parseEnv($this->googleApiKey) ?: null;
+    }
+
+    /** The server's Google key — its own if set, otherwise the browser's. */
+    public function getGoogleGeocodingApiKey(): ?string
+    {
+        return App::parseEnv($this->googleGeocodingApiKey) ?: $this->getGoogleApiKey();
+    }
+
+    public function getMapboxAccessToken(): ?string
+    {
+        return App::parseEnv($this->mapboxAccessToken) ?: null;
+    }
+
+    /**
+     * The widest radius a public search may ask for: the largest the built-in UI offers, or the
+     * default if that is larger. A public "no limit" would be a haversine over every row.
+     */
+    public function getMaxPublicRadius(): float
+    {
+        return max(max($this->getRadiusOptions()), $this->defaultRadius);
     }
 
     /**

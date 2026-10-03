@@ -1,0 +1,56 @@
+{# A store page, rendered by Fold's per-site template setting for the "tidewater" group. #}
+{% extends 'fold-demo/_layout' %}
+{% set title = location.title %}
+
+{% block content %}
+    <style>
+        .store { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+        .store h1 { margin-bottom: .6rem; }
+        .badge { display: inline-block; padding: .2rem .7rem; border-radius: 999px; font-size: .85rem; font-weight: 600; }
+        .badge.yes { background: #dcfce7; color: #15803d; } .badge.no { background: #fee2e2; color: #b91c1c; }
+        .store table { border-collapse: collapse; width: 100%; }
+        .store th, .store td { text-align: left; padding: .5rem 0; border-bottom: 1px solid #eef0f3; }
+        .store th { text-transform: capitalize; font-weight: 600; width: 40%; }
+        .store .map { height: 100%; min-height: 360px; border-radius: 12px; overflow: hidden; }
+        .store .map iframe { border: 0; width: 100%; height: 100%; }
+        .store a { color: var(--sea); }
+    </style>
+    <div class="store">
+        <div class="panel">
+            <h1>Tidewater {{ location.title }}</h1>
+            <p><span class="badge {{ location.isOpenNow() ? 'yes' : 'no' }}">{{ location.isOpenNow() ? 'Open now' : 'Closed now' }}</span>
+               {% if not location.isOpenNow() and location.nextOpeningAt %}<span class="sub">&nbsp;Opens {{ location.nextOpeningAt|date('D g:ia') }}</span>{% endif %}</p>
+            <p>{{ location.getFormattedAddress({ html: false })|nl2br }}</p>
+            <p><a href="tel:{{ location.phone }}">{{ location.phone }}</a> · <a href="{{ location.getDirectionsUrl() }}">Directions</a></p>
+            <h2 style="font-size:1.1rem;margin-top:1.4rem">Opening hours</h2>
+            <table>
+                {% for day, ranges in location.hours.week() %}
+                    <tr><th>{{ day }}</th><td>
+                        {%- for r in ranges %}{{ r.open }}–{{ r.close }}{% if not loop.last %}, {% endif %}{% else %}Closed{% endfor -%}
+                    </td></tr>
+                {% endfor %}
+            </table>
+        </div>
+        <div class="panel">
+            {% set exceptions = location.hours.exceptions() %}
+            {% if exceptions|length %}
+                <h2 style="font-size:1.1rem;margin-top:0">Holiday hours</h2>
+                <table>
+                    {% for date, ranges in exceptions %}
+                        <tr><th style="text-transform:none">{{ date|date('D j M') }}</th><td>
+                            {%- for r in ranges %}{{ r.open }}–{{ r.close }}{% if not loop.last %}, {% endif %}{% else %}Closed{% endfor -%}
+                        </td></tr>
+                    {% endfor %}
+                </table>
+            {% endif %}
+            <h2 style="font-size:1.1rem;margin-top:1.6rem">Other shops nearby</h2>
+            <table>
+                {% for near in craft.fold.locations.group('tidewater').id(['not', location.id]).nearby({ lat: location.lat, lng: location.lng, radius: 25 }).limit(4).all() %}
+                    <tr><th style="text-transform:none"><a href="{{ near.url }}">{{ near.title }}</a></th>
+                        <td>{{ near.distance|round(1) }} mi</td>
+                        <td><span class="badge {{ near.isOpenNow() ? 'yes' : 'no' }}">{{ near.isOpenNow() ? 'Open' : 'Closed' }}</span></td></tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
+{% endblock %}

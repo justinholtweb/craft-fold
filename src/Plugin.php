@@ -53,6 +53,7 @@ class Plugin extends BasePlugin
     public const PERMISSION_VIEW = 'fold:viewLocations';
     public const PERMISSION_MANAGE = 'fold:manageLocations';
     public const PERMISSION_DELETE = 'fold:deleteLocations';
+    public const PERMISSION_SEARCHES = 'fold:viewSearches';
 
     /** Log category used by everything in the plugin. */
     public const LOG_CATEGORY = 'fold';
@@ -110,7 +111,7 @@ class Plugin extends BasePlugin
             'url' => 'fold/locations',
         ];
 
-        if ($this->isPro() && $this->getSettings()->logSearches) {
+        if ($this->isPro() && $this->getSettings()->logSearches && Craft::$app->getUser()->checkPermission(self::PERMISSION_SEARCHES)) {
             $item['subnav']['searches'] = [
                 'label' => Craft::t('fold', 'Searches'),
                 'url' => 'fold/searches',
@@ -197,6 +198,12 @@ class Plugin extends BasePlugin
                             ],
                         ],
                     ],
+                    // Its own permission, not nested under locations: the log is what visitors
+                    // typed and roughly where they were, and editing a shop's phone number is no
+                    // reason to read that.
+                    self::PERMISSION_SEARCHES => [
+                        'label' => Craft::t('fold', 'View the search log'),
+                    ],
                 ],
             ];
         });
@@ -231,6 +238,12 @@ class Plugin extends BasePlugin
     {
         Event::on(Gc::class, Gc::EVENT_RUN, function() {
             $this->geocoder->purgeExpiredCache();
+
+            $days = $this->getSettings()->searchLogRetentionDays;
+
+            if ($days > 0) {
+                $this->search->purgeSearchLog($days);
+            }
         });
     }
 }

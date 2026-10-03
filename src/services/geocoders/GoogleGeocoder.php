@@ -20,14 +20,14 @@ class GoogleGeocoder extends BaseGeocoder
 
     public function isConfigured(): bool
     {
-        return !empty($this->settings->googleApiKey);
+        return !empty($this->settings->getGoogleGeocodingApiKey());
     }
 
     public function geocode(string $query, array $options = []): ?GeoPoint
     {
         $params = [
             'address' => $query,
-            'key' => $this->settings->googleApiKey,
+            'key' => $this->settings->getGoogleGeocodingApiKey(),
         ];
 
         if (!empty($options['countryCode'])) {
@@ -41,7 +41,7 @@ class GoogleGeocoder extends BaseGeocoder
     {
         return $this->readResponse($this->getJson(self::ENDPOINT, [
             'latlng' => sprintf('%s,%s', $lat, $lng),
-            'key' => $this->settings->googleApiKey,
+            'key' => $this->settings->getGoogleGeocodingApiKey(),
         ]));
     }
 

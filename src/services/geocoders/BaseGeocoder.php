@@ -52,7 +52,16 @@ abstract class BaseGeocoder implements GeocoderInterface
                 'headers' => $headers,
             ]);
         } catch (GuzzleException $e) {
-            throw new GeocodingException(sprintf('%s: %s', static::driverName(), $e->getMessage()), 0, $e);
+            // Guzzle's message quotes the full request URI, which carries `key=` or
+            // `access_token=` — and this message goes to the log. Keep the status, drop the URL.
+            $status = $e instanceof \GuzzleHttp\Exception\RequestException ? $e->getResponse()?->getStatusCode() : null;
+
+            throw new GeocodingException(sprintf(
+                '%s: %s%s',
+                static::driverName(),
+                (new \ReflectionClass($e))->getShortName(),
+                $status !== null ? " (HTTP $status)" : '',
+            ), 0, $e);
         }
 
         $decoded = json_decode((string)$response->getBody(), true);

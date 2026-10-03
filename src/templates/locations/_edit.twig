@@ -86,6 +86,7 @@
                 placeholder: 'Longitude'|t('fold'),
                 size: 14,
             }) }}
+            <input type="hidden" name="coordinatesSource" id="fold-coordinates-source" value="">
             <button type="button" class="btn" id="fold-geocode">{{ 'Look up'|t('fold') }}</button>
             <span class="spinner hidden" id="fold-geocode-spinner"></span>
         </div>
@@ -244,6 +245,18 @@
     var spinner = document.getElementById('fold-geocode-spinner');
     var error = document.getElementById('fold-geocode-error');
 
+    var source = document.getElementById('fold-coordinates-source');
+
+    // Typing in the boxes after a lookup makes them hand-placed again.
+    ['lat', 'lng'].forEach(function(id) {
+        var input = document.getElementById(id);
+        if (input && source) {
+            input.addEventListener('input', function() {
+                source.value = '';
+            });
+        }
+    });
+
     if (button) {
         button.addEventListener('click', function() {
             var data = { address: {} };
@@ -267,6 +280,7 @@
                     if (response.data.success) {
                         document.getElementById('lat').value = response.data.lat;
                         document.getElementById('lng').value = response.data.lng;
+                        source.value = 'geocoder';
                     } else {
                         error.textContent = response.data.message;
                         error.classList.remove('hidden');

@@ -235,6 +235,13 @@ check('hours round-trip through JSON', function() {
     return $again->forDay('sat') === [['open' => '10:00', 'close' => '16:00']] && $again->note === 'By appointment';
 });
 
+check('dated exceptions come back in date order, whatever order they were entered in', function() {
+    $hours = new OpeningHours(['exceptions' => ['2026-12-25' => [], '2026-11-26' => [], '2026-12-24' => ['09:00-13:00']]]);
+
+    return array_keys($hours->exceptions()) === ['2026-11-26', '2026-12-24', '2026-12-25']
+        ?: json_encode(array_keys($hours->exceptions()));
+});
+
 section('Groups');
 
 $suffix = substr(md5((string)microtime(true)), 0, 6);
@@ -863,6 +870,245 @@ check('the Lite location cap is actually enforced on save', function() use ($gro
     // being checked is that the answer follows the count rather than being hard-coded.
     return ($total < Edition::LITE_MAX_LOCATIONS) === $canCreate
         ?: "total=$total canCreate=" . var_export($canCreate, true);
+});
+
+section('Hardening');
+
+check('a CSV export defuses formulas but leaves numbers and phone numbers intact on re-import', function() use ($plugin, $makeLocation, $suffix) {
+    $shop = $makeLocation('=HYPERLINK("http://evil/") ' . $suffix, [35.2, -80.8], ['phone' => '+1 704 555 0199']);
+
+    if (!Craft::$app->getElements()->saveElement($shop)) {
+        return 'save failed: ' . json_encode($shop->getErrors());
+    }
+
+    $csv = $plugin->exporter->toCsv([$shop]);
+    $rows = array_map('str_getcsv', array_filter(explode("\n", preg_replace('/^\xEF\xBB\xBF/', '', $csv))));
+    $header = $rows[0];
+    $row = array_combine($header, array_slice($rows[1], 0, count($header)));
+
+    Craft::$app->getElements()->deleteElement($shop, true);
+
+    if (!str_starts_with($row['title'], "'=")) {
+        return 'title not escaped: ' . $row['title'];
+    }
+
+    if ($row['lng'] !== '-80.8000000' && $row['lng'] !== '-80.8') {
+        return 'longitude was touched: ' . $row['lng'];
+    }
+
+    return str_starts_with($row['phone'], "'+") ?: 'phone not escaped: ' . $row['phone'];
+});
+
+check('the importer strips the formula guard again', function() use ($plugin, $group, $suffix) {
+    $path = sys_get_temp_dir() . '/fold-check-guard.csv';
+    file_put_contents($path, "title,addressLine1,locality,countryCode,lat,lng,phone\n\"Guarded $suffix\",1 Main St,Charlotte,US,35.1,-80.9,'+1 704 555 0123\n");
+
+    $result = $plugin->importer->importCsv($path, ['groupId' => $group->id]);
+    @unlink($path);
+
+    $shop = Location::find()->groupId($group->id)->title("Guarded $suffix")->one();
+
+    return $shop?->phone === '+1 704 555 0123' ?: json_encode(['phone' => $shop?->phone, 'result' => $result]);
+});
+
+check('the Lite cap holds even for a save that bypasses Fold’s service', function() use ($makeLocation, $suffix) {
+    Craft::$app->getPlugins()->switchEdition('fold', Plugin::EDITION_LITE);
+
+    $locations = Plugin::getInstance()->locations;
+    $made = [];
+    $refused = false;
+
+    // Fill to the cap if the harness is below it, then try one more. Straight to
+    // `saveElement()`, the way Craft's Duplicate action and `elements/create` arrive.
+    for ($i = 0; $i <= Edition::LITE_MAX_LOCATIONS; $i++) {
+        $atCap = $locations->getTotalLocations() >= Edition::LITE_MAX_LOCATIONS;
+        $shop = $makeLocation("Cap $i $suffix", [35.0, -80.0]);
+        $saved = Craft::$app->getElements()->saveElement($shop);
+
+        if ($saved) {
+            $made[] = $shop;
+        }
+
+        if ($atCap) {
+            $refused = !$saved;
+            break;
+        }
+    }
+
+    Craft::$app->getPlugins()->switchEdition('fold', Plugin::EDITION_PRO);
+
+    foreach ($made as $shop) {
+        Craft::$app->getElements()->deleteElement($shop, true);
+    }
+
+    return $refused ?: 'a location over the cap was saved';
+});
+
+check('Pro is not capped by the same rule', function() use ($makeLocation, $suffix) {
+    $shop = $makeLocation("Uncapped $suffix", [35.0, -80.0]);
+    $saved = Craft::$app->getElements()->saveElement($shop);
+
+    if ($saved) {
+        Craft::$app->getElements()->deleteElement($shop, true);
+    }
+
+    return $saved;
+});
+
+check('API keys resolve environment variables', function() {
+    $settings = new justinholtweb\fold\models\Settings();
+    putenv('FOLD_CHECK_KEY=resolved-key');
+    $_SERVER['FOLD_CHECK_KEY'] = 'resolved-key';
+    $settings->googleApiKey = '$FOLD_CHECK_KEY';
+
+    return ($settings->getGoogleApiKey() === 'resolved-key' && $settings->getGoogleGeocodingApiKey() === 'resolved-key')
+        ?: json_encode([$settings->getGoogleApiKey(), $settings->getGoogleGeocodingApiKey()]);
+});
+
+check('the server key is preferred over the browser key for geocoding', function() {
+    $settings = new justinholtweb\fold\models\Settings();
+    $settings->googleApiKey = 'browser';
+    $settings->googleGeocodingApiKey = 'server';
+
+    return $settings->getGoogleGeocodingApiKey() === 'server' && $settings->getGoogleApiKey() === 'browser';
+});
+
+check('a secret Mapbox token is refused', function() {
+    $settings = new justinholtweb\fold\models\Settings();
+    $settings->mapboxAccessToken = 'sk.secret';
+    $refused = !$settings->validate(['mapboxAccessToken']);
+    $settings->mapboxAccessToken = 'pk.public';
+
+    return ($refused && $settings->validate(['mapboxAccessToken'])) ?: json_encode($settings->getErrors());
+});
+
+check('the widest public radius is the largest one the site offers', function() {
+    $settings = new justinholtweb\fold\models\Settings();
+    $settings->radiusOptions = [5, 10, 250];
+    $settings->defaultRadius = 25;
+
+    return $settings->getMaxPublicRadius() === 250.0 ?: (string)$settings->getMaxPublicRadius();
+});
+
+check('the search log keeps coordinates to about a kilometre', function() use ($plugin, $charlotte) {
+    $settings = $plugin->getSettings();
+    $was = $settings->logSearches;
+    $settings->logSearches = true;
+
+    $plugin->search->search(['lat' => 35.227123, 'lng' => -80.843187, 'radius' => 5]);
+
+    $settings->logSearches = $was;
+
+    $row = (new craft\db\Query())
+        ->from('{{%fold_searches}}')
+        ->orderBy(['id' => SORT_DESC])
+        ->one();
+
+    Craft::$app->getDb()->createCommand()->delete('{{%fold_searches}}', ['id' => $row['id']])->execute();
+
+    return ((float)$row['lat'] === 35.23 && (float)$row['lng'] === -80.84) ?: json_encode($row);
+});
+
+check('old search log rows are purged and recent ones kept', function() use ($plugin) {
+    $db = Craft::$app->getDb();
+    $now = new DateTime();
+    $insert = fn(string $when, string $term) => $db->createCommand()->insert('{{%fold_searches}}', [
+        'siteId' => Craft::$app->getSites()->getPrimarySite()->id,
+        'term' => $term,
+        'resultCount' => 0,
+        'dateCreated' => craft\helpers\Db::prepareDateForDb(new DateTime($when)),
+        'dateUpdated' => craft\helpers\Db::prepareDateForDb($now),
+        'uid' => craft\helpers\StringHelper::UUID(),
+    ])->execute();
+
+    $insert('-200 days', 'fold-check-old');
+    $insert('-1 day', 'fold-check-new');
+
+    $plugin->search->purgeSearchLog(90);
+
+    $left = (new craft\db\Query())->select('term')->from('{{%fold_searches}}')
+        ->where(['term' => ['fold-check-old', 'fold-check-new']])->column();
+
+    $db->createCommand()->delete('{{%fold_searches}}', ['term' => ['fold-check-old', 'fold-check-new']])->execute();
+
+    return $left === ['fold-check-new'] ?: json_encode($left);
+});
+
+check('an address that failed to geocode is not retried until it changes', function() use ($makeLocation, $suffix) {
+    $shop = $makeLocation("Unplaceable $suffix", [35.0, -80.0]);
+    $shop->lat = null;
+    $shop->lng = null;
+    $shop->geocodeState = Location::GEOCODE_FAILED;
+    $shop->geocodeHash = $shop->computeGeocodeHash();
+
+    $unchanged = $shop->needsGeocoding();
+    $shop->getAddress()->addressLine1 = '200 Other St';
+    $changed = $shop->needsGeocoding();
+
+    return (!$unchanged && $changed) ?: json_encode(['unchanged' => $unchanged, 'changed' => $changed]);
+});
+
+section('Front end');
+
+check('a group colour is normalized for the map, and anything else is refused', function() {
+    $group = new LocationGroup(['color' => 'C0FFEE']);
+    $ok = $group->getMarkerColor() === '#c0ffee';
+    $group->color = '#abc';
+    $short = $group->getMarkerColor() === '#aabbcc';
+    $group->color = '"><script>';
+    $hostile = $group->getMarkerColor() === null;
+    $group->color = null;
+
+    return ($ok && $short && $hostile && $group->getMarkerColor() === null)
+        ?: json_encode(compact('ok', 'short', 'hostile'));
+});
+
+check('the JSON endpoint carries the group colour, and null without one', function() use ($plugin, $group, $charlotte) {
+    $shape = new ReflectionMethod(justinholtweb\fold\controllers\SearchController::class, 'shape');
+    $controller = new justinholtweb\fold\controllers\SearchController('search', $plugin);
+    $search = fn() => $plugin->search->search([
+        'lat' => $charlotte[0],
+        'lng' => $charlotte[1],
+        'radius' => 200,
+        'group' => $group->handle,
+    ]);
+
+    $plain = $shape->invoke($controller, $search(), null)['locations'][0] ?? [];
+
+    $group->color = '#C0FFEE';
+    $plugin->groups->saveGroup($group);
+    $coloured = $shape->invoke($controller, $search(), null)['locations'][0] ?? [];
+    $group->color = null;
+    $plugin->groups->saveGroup($group);
+
+    return (array_key_exists('color', $plain) && $plain['color'] === null && ($coloured['color'] ?? null) === '#c0ffee')
+        ?: json_encode(['plain' => $plain['color'] ?? 'missing', 'coloured' => $coloured['color'] ?? 'missing']);
+});
+
+check('clustering is offered to Leaflet only, with its files', function() use ($plugin) {
+    $settings = $plugin->getSettings();
+    $was = [$settings->mapDriver, $settings->clusterMarkers];
+    $variable = new justinholtweb\fold\twig\FoldVariable();
+
+    $settings->clusterMarkers = true;
+    $settings->mapDriver = 'leaflet';
+    $leaflet = json_decode($variable->mapConfig(), true);
+    $settings->mapDriver = 'google';
+    $google = json_decode($variable->mapConfig(), true);
+    $settings->mapDriver = 'leaflet';
+    $settings->clusterMarkers = false;
+    $off = json_decode($variable->mapConfig(), true);
+
+    [$settings->mapDriver, $settings->clusterMarkers] = $was;
+
+    $ok = $leaflet['cluster'] === true
+        && str_ends_with((string)($leaflet['clusterJsUrl'] ?? ''), 'leaflet.markercluster.js')
+        && count($leaflet['clusterCssUrls'] ?? []) === 2
+        && $google['cluster'] === false
+        && $off['cluster'] === false
+        && !isset($off['clusterJsUrl']);
+
+    return $ok ?: json_encode(compact('leaflet', 'google', 'off'));
 });
 
 section('Cleanup');

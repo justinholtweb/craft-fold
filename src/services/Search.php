@@ -26,6 +26,9 @@ use justinholtweb\fold\records\SearchRecord;
  */
 class Search extends Component
 {
+    /** The longest search term a visitor may send. */
+    public const MAX_PUBLIC_TERM_LENGTH = 100;
+
     /**
      * @param array $params
      *   - `q` / `term`: free text, a postcode, or a "lat,lng" pair
@@ -107,6 +110,66 @@ class Search extends Component
         $this->log($result);
 
         return $result;
+    }
+
+    /**
+     * Search parameters taken from a visitor's request, made safe to search with.
+     *
+     * Everything a template or PHP passes to {@see search()} is trusted; this is the line between
+     * that and an anonymous query string, used by both the JSON endpoint and `craft.fold.locator()`.
+     *
+     * - Scalars only. `q[]=x` is otherwise an "Array to string conversion" 500.
+     * - The term is capped. Every distinct term is a geocoder request and a cache row, and nobody
+     *   searches for a store with a paragraph.
+     * - `country` must look like a country code. It is part of the geocode cache key, so a free
+     *   string would let one term miss the cache as many times as anyone liked.
+     * - The radius is clamped to (0, the widest the site offers]. A public "no limit" is a
+     *   haversine over every row — the bounding box is the whole design, and this is its door.
+     *
+     * @param string[] $names The parameters to read.
+     */
+    public function requestParams(array $names): array
+    {
+        $request = Craft::$app->getRequest();
+        $params = [];
+
+        foreach ($names as $name) {
+            $key = $name === 'countryCode' ? 'country' : $name;
+            $value = $request->getParam($key);
+
+            if ($value === null || $value === '') {
+                continue;
+            }
+
+            // `group` alone may be a list — `?group[]=retail&group[]=outlet` is a real filter.
+            if (is_array($value) && $name === 'group') {
+                $value = array_values(array_filter($value, 'is_string'));
+
+                if ($value === []) {
+                    continue;
+                }
+            } elseif (!is_scalar($value)) {
+                continue;
+            }
+
+            $params[$name] = $value;
+        }
+
+        if (isset($params['q'])) {
+            $params['q'] = mb_substr(trim((string)$params['q']), 0, self::MAX_PUBLIC_TERM_LENGTH);
+        }
+
+        if (isset($params['countryCode']) && !preg_match('/^[A-Za-z]{2}$/', (string)$params['countryCode'])) {
+            unset($params['countryCode']);
+        }
+
+        if (isset($params['radius'])) {
+            $max = Plugin::getInstance()->getSettings()->getMaxPublicRadius();
+            $radius = (float)$params['radius'];
+            $params['radius'] = $radius > 0 ? min($radius, $max) : $max;
+        }
+
+        return $params;
     }
 
     /**
@@ -251,8 +314,11 @@ class Search extends Component
         $record = new SearchRecord();
         $record->siteId = Craft::$app->getSites()->getCurrentSite()->id;
         $record->term = mb_substr((string)$result->term, 0, 255);
-        $record->lat = $result->origin?->lat;
-        $record->lng = $result->origin?->lng;
+        // Two decimal places is about a kilometre: enough for "people near here found nothing",
+        // not enough to be somebody's front door. The browser already rounds, but a direct API
+        // caller can send whatever precision it likes.
+        $record->lat = $result->origin !== null ? round($result->origin->lat, 2) : null;
+        $record->lng = $result->origin !== null ? round($result->origin->lng, 2) : null;
         $record->radius = $result->radius;
         $record->unit = $result->unit;
         $record->resultCount = $result->total;

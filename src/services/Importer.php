@@ -247,11 +247,17 @@ class Importer extends Component
         foreach ($map as $attribute => $index) {
             $value = $row[$index] ?? null;
 
+            // The exporter's formula guard, undone — see `Exporter::csvCell()`.
+            if (is_string($value) && preg_match("/^'[=+\-@\t\r]/", $value)) {
+                $value = substr($value, 1);
+            }
+
             if (str_starts_with($attribute, 'hours.')) {
                 $day = substr($attribute, 6);
 
                 if (trim((string)$value) !== '') {
-                    $hours[$day] = [$value];
+                    // `09:00-12:00, 13:00-17:00` — a split shift, the way the exporter writes it.
+                    $hours[$day] = preg_split('/\s*[,;]\s*/', trim((string)$value), -1, PREG_SPLIT_NO_EMPTY);
                 }
 
                 continue;

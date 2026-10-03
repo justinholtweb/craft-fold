@@ -55,6 +55,16 @@
             <input type="hidden" name="group" value="{{ options.group }}">
         {% endif %}
 
+        {# Carried on the form so a re-search keeps the template's filters: without them, the first
+           search from a "shops with this in stock" locator quietly widens to every shop. #}
+        {% if options.inStockOf is defined and options.inStockOf %}
+            <input type="hidden" name="inStockOf" value="{{ options.inStockOf.id ?? options.inStockOf }}">
+        {% endif %}
+
+        {% if options.openNow is defined and options.openNow %}
+            <input type="hidden" name="openNow" value="1">
+        {% endif %}
+
         <button type="submit">{{ 'Search'|t('fold') }}</button>
         <button type="button" data-fold-locate>{{ 'Use my location'|t('fold') }}</button>
     </form>
@@ -76,7 +86,14 @@
     <div class="fold-layout">
         <ol class="fold-results" data-fold-results>
             {% for location in result.locations %}
-                {% include 'fold/_locator/_result' with { location: location, unit: result.unit } only %}
+                {% set stock = options.inStockOf ?? null
+                    ? craft.app.plugins.getPlugin('fold').commerce.availableStock(location, options.inStockOf)
+                    : null %}
+                {% include 'fold/_locator/_result' with {
+                    location: location,
+                    unit: result.unit,
+                    inStock: stock is not null ? stock > 0 : null,
+                } only %}
             {% else %}
                 <li class="fold-empty">{{ 'No locations to show yet.'|t('fold') }}</li>
             {% endfor %}

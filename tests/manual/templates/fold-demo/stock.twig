@@ -1,0 +1,37 @@
+{#
+  A product page asking Fold the question WP Store Locator cannot: which shop near me has this?
+  The variant is looked up by SKU; `inStockOf` is a plain locator option, which Fold passes to its
+  search and from there to Commerce's own inventory levels.
+#}
+{% extends 'fold-demo/_layout' %}
+{% set title = 'Handheld VHF radio' %}
+{% set navOn = 'electronics' %}
+{% set variant = craft.variants.sku('WAVER-A-84787f').one() %}
+
+{% block content %}
+    <style>
+        .product { display: grid; grid-template-columns: 300px 1fr; gap: 32px; align-items: start; }
+        .product .art { aspect-ratio: 1; border-radius: 12px; background: linear-gradient(160deg, #dfe9ef, #c2d4de); display: grid; place-items: center; }
+        .product .art span { width: 70px; height: 170px; border-radius: 14px; background: #1d2733; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+        .product .art span::before { content: ''; position: absolute; left: 12px; right: 12px; top: 18px; height: 44px; border-radius: 4px; background: #9fd6c2; }
+        .product .art span::after { content: ''; position: absolute; left: 30px; top: -46px; width: 10px; height: 50px; border-radius: 5px; background: #1d2733; }
+        .price { font-size: 1.5rem; font-weight: 700; margin: .4rem 0 1rem; }
+        .pickup { margin: 0 0 1rem; font-weight: 600; color: var(--navy); }
+    </style>
+    <div class="product">
+        <div class="art"><span></span></div>
+        <div>
+            <h1>{{ variant.product.title ?? 'Handheld VHF radio' }}</h1>
+            <p class="price">$189.00</p>
+            <p class="pickup">Collect today — shops near Wilmington with this in stock</p>
+            <div class="panel">
+                {{ craft.fold.locator({
+                    group: 'tidewater',
+                    inStockOf: variant.id ?? null,
+                    q: craft.app.request.getParam('q') ?? 'Wilmington, NC',
+                    radius: craft.app.request.getParam('radius') ?? 100,
+                }) }}
+            </div>
+        </div>
+    </div>
+{% endblock %}
