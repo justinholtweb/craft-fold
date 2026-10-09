@@ -25,6 +25,10 @@ use justinholtweb\fold\models\LocationGroup;
 use justinholtweb\fold\models\LocationGroupSiteSettings;
 use justinholtweb\fold\Plugin;
 
+// Off for the run: Craft keys its GraphQL result cache by schema UID + query + variables, so a cached
+// answer from an earlier run could otherwise stand in for a denied case.
+Craft::$app->getConfig()->getGeneral()->enableGraphqlCaching = false;
+
 $passed = 0;
 $failed = 0;
 
