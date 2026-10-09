@@ -1,7 +1,6 @@
 # Release Notes for Fold
 
-## Unreleased
-
+## 5.1.0 - 2026-10-09
 ### Added
 
 - GraphQL: `foldLocations`, `foldLocation` and `foldLocationCount`, with `near: { lat, lng, radius, unit }`,
