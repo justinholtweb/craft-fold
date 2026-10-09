@@ -20,6 +20,8 @@ template is never limited to what Fold thought of.
 | `craft.fold.settings` | The plugin settings |
 | `craft.fold.distance(lat1, lng1, lat2, lng2, unit)` | Great-circle distance between two points; `unit` defaults to the **Distance unit** setting |
 | `craft.fold.mapConfig({ … })` | The JSON the front-end runtime reads, for building your own locator markup |
+| `craft.fold.schema(location, { … })` | LocalBusiness JSON-LD as a `<script>` tag — see [Structured data](structured-data) |
+| `craft.fold.schemaData(location, { … })` | The same structured data as an array |
 
 ## Location queries
 

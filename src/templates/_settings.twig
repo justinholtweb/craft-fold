@@ -254,3 +254,15 @@
         errors: settings.getErrors('defaultZoom'),
     }) }}
 </div>
+
+<hr>
+
+<h2>{{ 'Structured data'|t('fold') }}</h2>
+
+{{ forms.lightswitchField({
+    label: 'Add LocalBusiness structured data to location pages'|t('fold'),
+    instructions: 'Puts schema.org JSON-LD — address, coordinates, phone and opening hours, holiday hours included — in the head of each location’s own page. Each group chooses its type. Skipped while SEOmatic is installed; call `craft.fold.schema(location)` in a template to place it yourself.'|t('fold'),
+    name: 'injectSchema',
+    on: settings.injectSchema,
+    warning: craft.app.plugins.isPluginEnabled('seomatic') ? 'SEOmatic is installed, so automatic injection is off.'|t('fold'),
+}) }}

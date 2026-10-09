@@ -19,6 +19,8 @@ commercial geocoder, and the Commerce questions.
 - Opening hours with overnight ranges and per-location timezones, and the open-now filter
 - Store pages with per-site URIs and templates, a field layout, and the Locations relation field
 - The ready-made, server-rendered locator and the [JSON endpoint](json-endpoint)
+- [GraphQL](graphql) queries with radius search, and a schema permission per group
+- [LocalBusiness structured data](structured-data) on every store page, with a schema.org type per group
 - The geocoding console commands
 
 Trashed locations do not count towards the ten — they are not on the map. A location that exists on

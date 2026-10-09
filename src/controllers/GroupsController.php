@@ -101,6 +101,7 @@ class GroupsController extends Controller
         $group->color = $request->getBodyParam('color') ?: null;
         $group->marker = $request->getBodyParam('marker') ?: null;
         $group->defaultCountryCode = $request->getBodyParam('defaultCountryCode') ?: null;
+        $group->schemaType = trim((string)$request->getBodyParam('schemaType')) ?: null;
 
         $siteSettings = [];
 

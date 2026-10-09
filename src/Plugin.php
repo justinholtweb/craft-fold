@@ -9,17 +9,24 @@ use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
 use craft\events\RebuildConfigEvent;
 use craft\events\RegisterComponentTypesEvent;
+use craft\events\RegisterGqlQueriesEvent;
+use craft\events\RegisterGqlSchemaComponentsEvent;
+use craft\events\RegisterGqlTypesEvent;
 use craft\events\RegisterUrlRulesEvent;
 use craft\events\RegisterUserPermissionsEvent;
 use craft\services\Elements;
 use craft\services\Fields;
 use craft\services\Gc;
+use craft\services\Gql;
 use craft\services\ProjectConfig;
 use craft\services\UserPermissions;
 use craft\web\twig\variables\CraftVariable;
 use craft\web\UrlManager;
+use craft\web\View;
 use justinholtweb\fold\elements\Location;
 use justinholtweb\fold\fields\LocationsField;
+use justinholtweb\fold\gql\interfaces\LocationInterface;
+use justinholtweb\fold\gql\LocationQueries;
 use justinholtweb\fold\models\Settings;
 use justinholtweb\fold\services\Commerce;
 use justinholtweb\fold\services\Exporter;
@@ -27,6 +34,7 @@ use justinholtweb\fold\services\Geocoder;
 use justinholtweb\fold\services\Importer;
 use justinholtweb\fold\services\Groups;
 use justinholtweb\fold\services\Locations;
+use justinholtweb\fold\services\Schema;
 use justinholtweb\fold\services\Search;
 use justinholtweb\fold\twig\FoldVariable;
 use yii\base\Event;
@@ -41,6 +49,7 @@ use yii\base\Event;
  * @property-read Commerce $commerce
  * @property-read Importer $importer
  * @property-read Exporter $exporter
+ * @property-read Schema $schema
  * @property-read Settings $settings
  *
  * @method Settings getSettings()
@@ -58,7 +67,7 @@ class Plugin extends BasePlugin
     /** Log category used by everything in the plugin. */
     public const LOG_CATEGORY = 'fold';
 
-    public string $schemaVersion = '1.0.0';
+    public string $schemaVersion = '1.1.0';
     public bool $hasCpSection = true;
     public bool $hasCpSettings = true;
 
@@ -78,6 +87,7 @@ class Plugin extends BasePlugin
                 'commerce' => Commerce::class,
                 'importer' => Importer::class,
                 'exporter' => Exporter::class,
+                'schema' => Schema::class,
             ],
         ];
     }
@@ -92,6 +102,8 @@ class Plugin extends BasePlugin
         $this->registerPermissions();
         $this->registerProjectConfig();
         $this->registerTwig();
+        $this->registerGraphQl();
+        $this->registerStructuredData();
         $this->registerGarbageCollection();
     }
 
@@ -225,6 +237,47 @@ class Plugin extends BasePlugin
     {
         Event::on(CraftVariable::class, CraftVariable::EVENT_INIT, function(Event $event) {
             $event->sender->set('fold', FoldVariable::class);
+        });
+    }
+
+    /**
+     * `foldLocations` / `foldLocation` / `foldLocationCount`, one type per group, and a schema
+     * permission per group — the same shape as Craft's own category groups.
+     */
+    private function registerGraphQl(): void
+    {
+        Event::on(Gql::class, Gql::EVENT_REGISTER_GQL_TYPES, function(RegisterGqlTypesEvent $event) {
+            $event->types[] = LocationInterface::class;
+        });
+
+        Event::on(Gql::class, Gql::EVENT_REGISTER_GQL_QUERIES, function(RegisterGqlQueriesEvent $event) {
+            $event->queries = array_merge($event->queries, LocationQueries::getQueries());
+        });
+
+        Event::on(Gql::class, Gql::EVENT_REGISTER_GQL_SCHEMA_COMPONENTS, function(RegisterGqlSchemaComponentsEvent $event) {
+            $components = [];
+
+            foreach ($this->groups->getAllGroups() as $group) {
+                $components['foldLocationGroups.' . $group->uid . ':read'] = [
+                    'label' => Craft::t('fold', 'Query for locations in the “{name}” location group', ['name' => $group->name]),
+                ];
+            }
+
+            if ($components !== []) {
+                $event->queries[Craft::t('fold', 'Fold locations')] = $components;
+            }
+        });
+    }
+
+    /**
+     * LocalBusiness JSON-LD in the `<head>` of every location's own page — see {@see Schema}.
+     */
+    private function registerStructuredData(): void
+    {
+        Event::on(View::class, View::EVENT_BEFORE_RENDER_PAGE_TEMPLATE, function() {
+            if (Craft::$app->getView()->getTemplateMode() === View::TEMPLATE_MODE_SITE) {
+                $this->schema->injectForMatchedElement();
+            }
         });
     }
 

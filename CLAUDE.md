@@ -68,6 +68,18 @@ when the address actually changed. Editing a phone number must not cost a geocod
   endpoint and the console all use
 - `commerce` — inventory-location linking and stock filtering; completely inert without Commerce
 - `importer` / `exporter` — CSV and JSON, round-tripping
+- `schema` — LocalBusiness JSON-LD: built from the location, injected into the `<head>` of a matched
+  location page (`View::EVENT_BEFORE_RENDER_PAGE_TEMPLATE` + `UrlManager::getMatchedElement()`),
+  skipped while SEOmatic is installed, and never printed twice on one page
+
+### GraphQL
+
+`src/gql/` follows Craft's category-group shape: `FoldLocationInterface`, one type per group
+(`<handle>_FoldLocation`) from `LocationGenerator`, and a schema component per group,
+`foldLocationGroups.<uid>:read`. `LocationResolver` narrows every query to the granted groups' IDs
+and applies the public clamps — `near.radius` through `Search::clampPublicRadius()` (the same
+function the JSON endpoint uses) and `limit` to `maxLimit`. `near` and `openNow` are resolver-only
+arguments, never passed to the element query.
 
 ## Traps found while building this
 
@@ -95,6 +107,11 @@ when the address actually changed. Editing a phone number must not cost a geocod
   name-match fallback is what stops a timeout from looking like "no shops near you".
 - **An unbiased geocoder is worse than a wrong one.** "NoDa" resolves to a town in Japan without a
   country bias. Searches are biased to `defaultCountryCode` unless told otherwise.
+- **Craft's GraphQL drops an unknown root field silently.** A query for `foldLocations` against a
+  schema with no Fold groups comes back `{"data": []}`, not an error — the same as `entries` on a
+  schema with no sections. A check for "the query is not exposed" must look for the missing key.
+- **`getEagerLoadingGqlConditions()` returning `[]` is no condition at all.** `null` is Craft's
+  "return nothing"; an empty `groupId` list would be ignored by `Db::parseParam`.
 - **`{{ redirectInput() }}` is hashed**, so a curl-driven form post must omit `redirect` entirely
   or Craft rejects the whole request with "invalid body param".
 
@@ -107,6 +124,7 @@ No local PHP on this Mac. Everything runs inside the plugin-testing container:
 ```sh
 cd ~/Sites/plugin-testing
 ddev exec php /var/www/craft-fold/tests/integration/checks.php     # 99 checks
+ddev exec php /var/www/craft-fold/tests/integration/gql-schema.php # 31 checks: GraphQL + JSON-LD
 ddev exec bash -c 'find /var/www/craft-fold/src -name "*.php" -print0 | xargs -0 -n1 php -l'
 ```
 

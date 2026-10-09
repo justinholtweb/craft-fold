@@ -57,6 +57,31 @@ class FoldVariable extends Behavior
         return Plugin::getInstance()->search->search($params);
     }
 
+    /**
+     * LocalBusiness structured data for a location, as a ready `<script type="application/ld+json">`.
+     *
+     * ```twig
+     * {% block head %}{{ craft.fold.schema(location) }}{% endblock %}
+     * ```
+     *
+     * Not needed on a location's own page when automatic injection is on — Fold adds it there
+     * already. For a page that renders a location some other way, or with SEOmatic installed.
+     */
+    public function schema(Location $location, array $overrides = []): Markup
+    {
+        return Plugin::getInstance()->schema->render($location, $overrides);
+    }
+
+    /**
+     * The same structured data as an array, to change or to hand to another SEO plugin.
+     *
+     * @return array<string, mixed>
+     */
+    public function schemaData(Location $location, array $overrides = []): array
+    {
+        return Plugin::getInstance()->schema->build($location, $overrides);
+    }
+
     /** @return LocationGroup[] */
     public function getGroups(): array
     {

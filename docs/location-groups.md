@@ -9,6 +9,8 @@ Every location belongs to exactly one group. A group is to Fold what a section i
 decides which fields a location has, which sites it exists on, and whether it gets a page of its
 own.
 
+Each group is also its own [GraphQL](graphql) type and schema permission.
+
 Groups are why "Retail Stores" and "Service Centres" can be different things. A service centre
 wants *Bays* and *Brands serviced*; a shop wants *Store manager* and *Click & collect*. One
 settings screen could not give both a field layout and a URL, so groups exist.
@@ -23,6 +25,7 @@ so they are **admin-only**.
 | **Name**, **Handle** | The handle is what templates and the JSON endpoint use: `group: 'retail'`. |
 | **Marker colour** | The colour of this group's pins on the built-in locator's map (all three providers). Blank keeps the provider's default pin. Also available in templates as `location.group.color`, and as `color` on each location in the [JSON endpoint](json-endpoint). |
 | **Default country** | Two-letter code new addresses in this group start in. Blank falls back to the plugin's **Default country**. |
+| **Schema.org type** | What this group's locations are published as in their [structured data](structured-data) — `Restaurant`, `AutoRepair`, `Store`. Blank means `LocalBusiness`. |
 | **Field layout** | Any Craft fields you like, laid out with the usual designer. |
 
 Lite allows **one** group; Pro allows any number. See [Editions](editions).

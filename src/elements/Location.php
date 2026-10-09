@@ -15,7 +15,9 @@ use craft\helpers\UrlHelper;
 use craft\models\FieldLayout;
 use DateTime;
 use DateTimeInterface;
+use GraphQL\Type\Definition\Type;
 use justinholtweb\fold\elements\db\LocationQuery;
+use justinholtweb\fold\gql\interfaces\LocationInterface;
 use justinholtweb\fold\helpers\Geo;
 use justinholtweb\fold\models\Edition;
 use justinholtweb\fold\models\LocationGroup;
@@ -146,6 +148,35 @@ class Location extends Element
     public static function find(): ElementQueryInterface
     {
         return new LocationQuery(static::class);
+    }
+
+    // GraphQL
+    // -------------------------------------------------------------------------
+
+    /** One GraphQL type per group, as Craft does for category groups: `retail_FoldLocation`. */
+    public static function gqlTypeName(LocationGroup $group): string
+    {
+        return sprintf('%s_FoldLocation', $group->handle);
+    }
+
+    public static function baseGqlType(): Type
+    {
+        return LocationInterface::getType();
+    }
+
+    /**
+     * The schema component a group's locations need: `foldLocationGroups.<uid>`.
+     *
+     * @param LocationGroup $context
+     */
+    public static function gqlScopesByContext(mixed $context): array
+    {
+        return ['foldLocationGroups.' . $context->uid];
+    }
+
+    public function getGqlTypeName(): string
+    {
+        return static::gqlTypeName($this->getGroup());
     }
 
     // Group, sites and URLs

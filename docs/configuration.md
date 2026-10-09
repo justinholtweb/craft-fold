@@ -50,6 +50,12 @@ busy site — **Geocoding provider**.
 | Keep searches for | `searchLogRetentionDays` | `90` | Pro. Days a search log row is kept; older rows are deleted by Craft's garbage collection. `0` keeps them forever. |
 | Publish exact stock counts | `exposeStockLevels` | Off | Pro + Commerce. Adds `availableStock` to stock searches on the JSON endpoint; off, only `inStock` is published. See [Commerce stock](commerce-stock). |
 
+## Structured data
+
+| Setting | Config key | Default | What it does |
+| --- | --- | --- | --- |
+| Add LocalBusiness structured data to location pages | `injectSchema` | On | Puts schema.org JSON-LD in the `<head>` of every location's own page. Skipped while SEOmatic is installed. See [Structured data](structured-data). |
+
 ## Defaults
 
 | Setting | Config key | Default | What it does |

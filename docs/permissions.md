@@ -39,6 +39,12 @@ their subnav items only appear for admins. Groups are also project config: on an
 `allowAdminChanges` off, nobody can change them there, admin or not. That is Craft's behaviour and
 the right one — a group's field layout is schema, and schema is authored locally and deployed.
 
+## GraphQL schemas
+
+Fold's [GraphQL](graphql) queries are governed by schema permissions, not user permissions: one per
+location group, under **Fold locations** on the schema's edit screen. A schema sees only the groups it
+was granted — through `foldLocations` and through Locations relation fields alike.
+
 ## The front end is public
 
 The [JSON endpoint](json-endpoint) and `craft.fold.locator()` are anonymous by design: a store

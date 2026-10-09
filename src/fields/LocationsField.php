@@ -6,7 +6,15 @@ namespace justinholtweb\fold\fields;
 
 use Craft;
 use craft\fields\BaseRelationField;
+use craft\helpers\Gql as GqlHelper;
+use craft\models\GqlSchema;
+use craft\services\Gql as GqlService;
+use GraphQL\Type\Definition\Type;
 use justinholtweb\fold\elements\Location;
+use justinholtweb\fold\gql\arguments\LocationArguments;
+use justinholtweb\fold\gql\interfaces\LocationInterface;
+use justinholtweb\fold\gql\resolvers\LocationResolver;
+use justinholtweb\fold\Plugin;
 
 /**
  * A Locations relation field.
@@ -44,5 +52,44 @@ class LocationsField extends BaseRelationField
     public static function phpType(): string
     {
         return sprintf('\\%s|\\%s<\\%s>', \craft\elements\db\ElementQueryInterface::class, \craft\elements\ElementCollection::class, Location::class);
+    }
+
+    /** Shown in a schema only when that schema can read at least one location group. */
+    public function includeInGqlSchema(GqlSchema $schema): bool
+    {
+        return !empty($schema->getAllScopePairsForAction('read')['foldLocationGroups']);
+    }
+
+    public function getContentGqlType(): Type|array
+    {
+        return [
+            'name' => $this->handle,
+            'type' => Type::nonNull(Type::listOf(LocationInterface::getType())),
+            'args' => LocationArguments::getArguments(),
+            'resolve' => LocationResolver::class . '::resolve',
+            'complexity' => GqlHelper::relatedArgumentComplexity(GqlService::GRAPHQL_COMPLEXITY_EAGER_LOAD),
+        ];
+    }
+
+    /**
+     * Eager-loaded relations are held to the schema's groups too — otherwise a Locations field
+     * on an entry would be a way round a schema that was never given the group.
+     */
+    public function getEagerLoadingGqlConditions(): ?array
+    {
+        $uids = GqlHelper::extractAllowedEntitiesFromSchema()['foldLocationGroups'] ?? [];
+
+        if (!is_array($uids) || $uids === []) {
+            return null;
+        }
+
+        $groups = Plugin::getInstance()->groups;
+        $ids = array_values(array_filter(array_map(
+            static fn(string $uid) => $groups->getGroupByUid($uid)?->id,
+            $uids,
+        )));
+
+        // Null is Craft's "return nothing"; an empty list would be no condition at all.
+        return $ids !== [] ? ['groupId' => $ids] : null;
     }
 }

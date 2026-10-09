@@ -36,6 +36,9 @@ class Install extends Migration
             'color' => $this->string(16),
             'marker' => $this->string(64),
             'defaultCountryCode' => $this->string(2),
+            // The schema.org type this group's locations are published as — `Restaurant`,
+            // `AutoRepair`. Null means plain `LocalBusiness`.
+            'schemaType' => $this->string(64),
             'fieldLayoutId' => $this->integer(),
             'sortOrder' => $this->smallInteger()->unsigned(),
             'dateCreated' => $this->dateTime()->notNull(),

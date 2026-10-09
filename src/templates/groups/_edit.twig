@@ -55,6 +55,19 @@
         errors: group.getErrors('defaultCountryCode'),
     }) }}
 
+    {% set schemaTypes = ['LocalBusiness', 'Store', 'Restaurant', 'CafeOrCoffeeShop', 'Bakery', 'BarOrPub', 'AutoRepair', 'AutoDealer', 'GasStation', 'Pharmacy', 'MedicalClinic', 'Dentist', 'BankOrCreditUnion', 'HealthClub', 'HairSalon', 'LodgingBusiness', 'ProfessionalService', 'ClothingStore', 'ElectronicsStore', 'FurnitureStore', 'GroceryStore', 'HardwareStore', 'SportingGoodsStore'] %}
+    {{ forms.autosuggestField({
+        label: 'Schema.org type'|t('fold'),
+        instructions: 'What this group’s locations are published as in their LocalBusiness structured data. Use the most specific schema.org type that fits; blank means LocalBusiness.'|t('fold'),
+        id: 'schemaType',
+        name: 'schemaType',
+        class: 'code',
+        placeholder: 'LocalBusiness',
+        value: group.schemaType,
+        suggestions: [{ label: 'schema.org'|t('fold'), data: schemaTypes|map(t => { name: t }) }],
+        errors: group.getErrors('schemaType'),
+    }) }}
+
     <hr>
 
     <h2>{{ 'Site settings'|t('app') }}</h2>

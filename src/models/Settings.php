@@ -155,6 +155,15 @@ class Settings extends Model
     /** Ask the browser for the visitor's position, with their permission, on first load. */
     public bool $requestBrowserLocation = false;
 
+    /**
+     * Add LocalBusiness structured data to the `<head>` of every location's own page.
+     *
+     * Only the pages Craft routes to a location through its group's URI format; a template that
+     * renders a location some other way calls `craft.fold.schema(location)` itself. Skipped while
+     * SEOmatic is installed, which builds the page's JSON-LD and would end up with two.
+     */
+    public bool $injectSchema = true;
+
     public function rules(): array
     {
         return [

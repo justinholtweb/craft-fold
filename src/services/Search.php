@@ -164,12 +164,28 @@ class Search extends Component
         }
 
         if (isset($params['radius'])) {
-            $max = Plugin::getInstance()->getSettings()->getMaxPublicRadius();
-            $radius = (float)$params['radius'];
-            $params['radius'] = $radius > 0 ? min($radius, $max) : $max;
+            $params['radius'] = $this->clampPublicRadius((float)$params['radius']);
         }
 
         return $params;
+    }
+
+    /**
+     * A radius a visitor asked for, made safe: within (0, the widest the site offers].
+     *
+     * Shared by the JSON endpoint, the locator's query string and GraphQL, so all three doors
+     * have the same width. Null — nothing asked — is the default radius, held to the same cap.
+     */
+    public function clampPublicRadius(?float $radius): float
+    {
+        $settings = Plugin::getInstance()->getSettings();
+        $max = $settings->getMaxPublicRadius();
+
+        if ($radius === null) {
+            return min($settings->defaultRadius, $max);
+        }
+
+        return $radius > 0 ? min($radius, $max) : $max;
     }
 
     /**

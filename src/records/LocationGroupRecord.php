@@ -15,6 +15,7 @@ use yii\db\ActiveQueryInterface;
  * @property string|null $color
  * @property string|null $marker
  * @property string|null $defaultCountryCode
+ * @property string|null $schemaType
  * @property int|null $fieldLayoutId
  * @property int|null $sortOrder
  */

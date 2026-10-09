@@ -1,5 +1,27 @@
 # Release Notes for Fold
 
+## Unreleased
+
+### Added
+
+- GraphQL: `foldLocations`, `foldLocation` and `foldLocationCount`, with `near: { lat, lng, radius, unit }`,
+  `openNow`, `group`, `groupId`, `hasCoordinates` and `inStockOf` (Pro + Commerce) arguments. Each
+  location group is its own type (`retail_FoldLocation`) carrying its custom fields, and its own schema
+  permission. Address, opening hours, `openNow`, `distance` and `directionsUrl` come back in the JSON
+  endpoint's shape.
+- GraphQL is held to the JSON endpoint's limits: the radius is clamped to the widest the site offers,
+  and no more than `maxLimit` rows are returned.
+- The Locations relation field is available in GraphQL, takes the same arguments, and only returns
+  locations in groups the schema was granted.
+- LocalBusiness structured data. Every location's own page gets schema.org JSON-LD in its `<head>` —
+  address, coordinates, telephone, opening hours, and upcoming holiday hours from dated exceptions —
+  unless SEOmatic is installed. Controlled by the new **Add LocalBusiness structured data to location
+  pages** setting (`injectSchema`, on by default).
+- A **Schema.org type** per location group (`Restaurant`, `AutoRepair`, `Store`…), used as the
+  structured data's `@type`. Blank means `LocalBusiness`.
+- `craft.fold.schema(location)` and `craft.fold.schemaData(location)`, and
+  `Schema::EVENT_DEFINE_SCHEMA` for adding properties Fold has no field for.
+
 ## 5.0.0
 
 Initial release.

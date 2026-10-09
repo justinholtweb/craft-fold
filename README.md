@@ -40,6 +40,10 @@ JavaScript off, and enhanced by a small runtime when JavaScript is on.
   comes from Commerce, and the locator can filter to shops that have a purchasable in stock.
 - **A JSON endpoint** at `/fold/search.json`, anonymous and cacheable, so you can build your own
   front end and still get the same results the built-in one gets.
+- **GraphQL.** `foldLocations` with `near: { lat, lng, radius }`, `openNow` and `group`, a type per
+  group carrying its custom fields, and a schema permission per group.
+- **LocalBusiness structured data** in the head of every store page — address, coordinates, phone,
+  opening hours and holiday hours — with a schema.org type per group (`Restaurant`, `AutoRepair`…).
 - **CSV import and export** that round-trips, and reads the column names somebody else's system
   exported.
 
@@ -65,6 +69,7 @@ php craft plugin/install fold
 | Map | Leaflet / OpenStreetMap | + Google Maps, Mapbox |
 | Geocoding | Nominatim | + Google, Mapbox |
 | Radius search, hours, store pages, JSON API | ✓ | ✓ |
+| GraphQL, LocalBusiness structured data | ✓ | ✓ |
 | Commerce inventory link and stock filter | | ✓ |
 | CSV import, CSV and JSON export | | ✓ |
 | Search recording | | ✓ |
@@ -202,6 +207,42 @@ The response carries the locations, their distances, the geocoded origin, the ma
 importantly — `originNotFound`, so a front end can tell "we couldn't find that place" apart from
 "there's nothing near it". They deserve different messages.
 
+## GraphQL
+
+```graphql
+{
+  foldLocations(near: { lat: 35.2271, lng: -80.8431, radius: 25 }, group: "retail", openNow: true) {
+    title url distance phone
+    address { addressLine1 locality postalCode }
+    hours { week { day ranges { open close } } }
+  }
+}
+```
+
+`foldLocations`, `foldLocation` and `foldLocationCount`, with one type per group (`retail_FoldLocation`)
+carrying that group's custom fields. Each group is its own schema permission, under **Fold locations**.
+GraphQL is held to the JSON endpoint's limits: the radius is clamped to the widest the site offers, and
+no more than `maxLimit` rows come back. `near` takes coordinates — geocode in the front end, or use the
+JSON endpoint's `q`. A Locations relation field takes the same arguments. See `docs/graphql.md`.
+
+## Structured data
+
+Every location's own page gets schema.org `LocalBusiness` JSON-LD in its `<head>`: name, URL,
+telephone, a `PostalAddress`, `GeoCoordinates`, `openingHoursSpecification` (days with the same hours
+share one entry) and `specialOpeningHoursSpecification` from upcoming dated exceptions (a closed day is
+`00:00`–`00:00`). Each group picks its `@type` — `Restaurant`, `AutoRepair`, `Store` — and blank means
+`LocalBusiness`.
+
+It is automatic (`injectSchema`, on by default) and stands down while SEOmatic is installed. To place
+it yourself, or add to it:
+
+```twig
+{{ craft.fold.schema(location, { priceRange: '$$' }) }}
+```
+
+`craft.fold.schemaData(location)` returns the array, and `Schema::EVENT_DEFINE_SCHEMA` lets a module
+change it. See `docs/structured-data.md`.
+
 ## Console commands
 
 ```sh
@@ -238,6 +279,7 @@ return [
     'googleGeocodingApiKey' => '$GOOGLE_GEOCODING_KEY', // server: restrict by IP
     'searchRateLimit' => 30,
     'searchLogRetentionDays' => 90,
+    'injectSchema' => true,                           // LocalBusiness JSON-LD on store pages
 ];
 ```
 

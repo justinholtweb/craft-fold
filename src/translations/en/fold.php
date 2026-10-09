@@ -9,12 +9,20 @@
 
 return [
     // Plugin and nav
+    'Add LocalBusiness structured data to location pages' => 'Add LocalBusiness structured data to location pages',
+    'Enter a schema.org type name, such as Restaurant or AutoRepair.' => 'Enter a schema.org type name, such as Restaurant or AutoRepair.',
+    'Fold locations' => 'Fold locations',
     'Fold' => 'Fold',
     'Locations' => 'Locations',
     'Location' => 'Location',
     'location' => 'location',
     'locations' => 'locations',
     'Groups' => 'Groups',
+    'Puts schema.org JSON-LD — address, coordinates, phone and opening hours, holiday hours included — in the head of each location’s own page. Each group chooses its type. Skipped while SEOmatic is installed; call `craft.fold.schema(location)` in a template to place it yourself.' => 'Puts schema.org JSON-LD — address, coordinates, phone and opening hours, holiday hours included — in the head of each location’s own page. Each group chooses its type. Skipped while SEOmatic is installed; call `craft.fold.schema(location)` in a template to place it yourself.',
+    'Query for locations in the “{name}” location group' => 'Query for locations in the “{name}” location group',
+    'schema.org' => 'schema.org',
+    'Schema.org type' => 'Schema.org type',
+    'SEOmatic is installed, so automatic injection is off.' => 'SEOmatic is installed, so automatic injection is off.',
     'Settings' => 'Settings',
     'Searches' => 'Searches',
 
@@ -24,8 +32,10 @@ return [
     'Awaiting coordinates' => 'Awaiting coordinates',
     'Could not be placed' => 'Could not be placed',
     'New location' => 'New location',
+    'Structured data' => 'Structured data',
     'Untitled location' => 'Untitled location',
     'Geocode pending' => 'Geocode pending',
+    'What this group’s locations are published as in their LocalBusiness structured data. Use the most specific schema.org type that fits; blank means LocalBusiness.' => 'What this group’s locations are published as in their LocalBusiness structured data. Use the most specific schema.org type that fits; blank means LocalBusiness.',
     '{remaining} of {max} locations remaining on Fold Lite.' => '{remaining} of {max} locations remaining on Fold Lite.',
     '{count} locations queued for geocoding.' => '{count} locations queued for geocoding.',
 

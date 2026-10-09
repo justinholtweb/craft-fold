@@ -221,6 +221,7 @@ class Groups extends Component
             $record->color = $data['color'] ?? null;
             $record->marker = $data['marker'] ?? null;
             $record->defaultCountryCode = $data['defaultCountryCode'] ?? null;
+            $record->schemaType = $data['schemaType'] ?? null;
             $record->sortOrder = $data['sortOrder'] ?? null;
 
             if (!empty($data['fieldLayouts']) && !empty($config = reset($data['fieldLayouts']))) {
@@ -356,6 +357,7 @@ class Groups extends Component
             'color' => $record->color,
             'marker' => $record->marker,
             'defaultCountryCode' => $record->defaultCountryCode,
+            'schemaType' => $record->schemaType,
             'fieldLayoutId' => $record->fieldLayoutId !== null ? (int)$record->fieldLayoutId : null,
             'sortOrder' => $record->sortOrder !== null ? (int)$record->sortOrder : null,
             'uid' => $record->uid,

@@ -29,6 +29,9 @@ use justinholtweb\fold\records\LocationGroupRecord;
  */
 class LocationGroup extends Model
 {
+    /** A schema.org type name: one PascalCase word, no namespace, no URL. */
+    public const SCHEMA_TYPE_PATTERN = '/^[A-Z][A-Za-z0-9]{1,63}$/';
+
     public ?int $id = null;
     public ?string $name = null;
     public ?string $handle = null;
@@ -44,6 +47,12 @@ class LocationGroup extends Model
 
     /** Country new locations in this group start in; falls back to the plugin setting. */
     public ?string $defaultCountryCode = null;
+
+    /**
+     * The schema.org type this group's locations are published as in their structured data —
+     * `Restaurant`, `AutoRepair`, `Store`. Null means `LocalBusiness`, which every subtype is.
+     */
+    public ?string $schemaType = null;
 
     public ?int $fieldLayoutId = null;
     public ?int $sortOrder = null;
@@ -131,6 +140,20 @@ class LocationGroup extends Model
         return preg_match('/^#[0-9a-f]{6}$/', $color) ? $color : null;
     }
 
+    /**
+     * The `@type` for this group's structured data.
+     *
+     * Checked again on the way out, as the colour is: the value also arrives through project
+     * config, and a type that is not a schema.org-shaped name is worse than the generic one —
+     * Google drops the whole block rather than the one bad property.
+     */
+    public function getSchemaType(): string
+    {
+        $type = trim((string)$this->schemaType);
+
+        return preg_match(self::SCHEMA_TYPE_PATTERN, $type) ? $type : 'LocalBusiness';
+    }
+
     public function getCpEditUrl(): string
     {
         return sprintf('settings/fold/groups/%s', $this->id ?? 'new');
@@ -145,6 +168,7 @@ class LocationGroup extends Model
             [['color'], ColorValidator::class],
             [['marker'], 'string', 'max' => 64],
             [['defaultCountryCode'], 'string', 'max' => 2],
+            [['schemaType'], 'match', 'pattern' => self::SCHEMA_TYPE_PATTERN, 'message' => Craft::t('fold', 'Enter a schema.org type name, such as Restaurant or AutoRepair.')],
             [
                 ['handle'],
                 HandleValidator::class,
@@ -201,6 +225,7 @@ class LocationGroup extends Model
             'color' => $this->color ?: null,
             'marker' => $this->marker ?: null,
             'defaultCountryCode' => $this->defaultCountryCode ?: null,
+            'schemaType' => $this->schemaType ?: null,
             'sortOrder' => $this->sortOrder,
             'siteSettings' => [],
         ];
